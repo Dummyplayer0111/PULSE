@@ -1,0 +1,115 @@
+from fastapi import FastAPI, Body, HTTPException
+import numpy as np
+from typing import List, Optional
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("PULSE-AI")
+
+app = FastAPI(title="PULSE Advanced AI Engine")
+
+@app.post("/classify")
+async def classify(data: dict = Body(...)):
+    """
+    Classifies failure logs and recommends self-healing actions.
+    """
+    event_code = data.get("eventCode", "")
+    log_level = data.get("logLevel", "")
+
+    if log_level == "INFO":
+        return None
+
+    mapping = {
+        "NETWORK_TIMEOUT": ("NETWORK", "RESTART_SERVICE", 0.98),
+        "NETWORK_LATENCY_HIGH": ("NETWORK", "SWITCH_NETWORK", 0.85),
+        "CARD_READ_ERROR": ("HARDWARE", "NONE", 0.90),
+        "CASH_DISPENSE_FAIL": ("CASH_JAM", "NONE", 0.92),
+        "HARDWARE_JAM": ("CASH_JAM", "NONE", 0.97),
+        "MALWARE_SIGNATURE": ("FRAUD", "FREEZE_ATM", 0.99),
+        "UPS_FAILURE": ("HARDWARE", "SWITCH_NETWORK", 0.95)
+    }
+
+    category, self_heal, confidence = mapping.get(event_code, ("UNKNOWN", "ALERT_ENGINEER", 0.5))
+
+    if confidence < 0.6:
+        category = "UNKNOWN"
+
+    logger.info(f"Classified {event_code} as {category} with {confidence*100}% confidence")
+
+    return {
+        "category": category,
+        "detail": f"AI identified {category} failure via {event_code}",
+        "confidence": confidence,
+        "selfHealAction": self_heal, # NEW: Tells Django how to fix it
+        "recommendedAction": "Dispatch field engineer" if self_heal == "NONE" else "Auto-recovering...",
+        "keywords": event_code.lower().split("_")
+    }
+
+@app.post("/predict")
+async def predict(data: dict = Body(...)):
+    """
+    Predicts failures using rolling means and variance analysis.
+    """
+    snapshots = data.get("snapshots", [])
+    if not snapshots:
+        raise HTTPException(status_code=400, detail="No snapshots provided")
+
+    scores = [s["healthScore"] for s in snapshots]
+    
+    mean_score = np.mean(scores)
+    variance = np.var(scores)
+    
+    slope = 0
+    if len(scores) > 1:
+        slope = np.polyfit(np.arange(len(scores)), scores, 1)[0]
+
+    components = ["networkScore", "hardwareScore", "softwareScore", "transactionScore"]
+    last_snap = snapshots[-1]
+    weakest = min(components, key=lambda c: last_snap.get(c, 100))
+
+    fail_prob = min(1.0, abs(slope) * 0.5 + (variance / 100)) if slope < 0 else 0.05
+
+    return {
+        "sourceId": data.get("sourceId"),
+        "currentHealth": round(scores[-1], 1),
+        "meanHealth": round(float(mean_score), 1),
+        "variance": round(float(variance), 2),
+        "failureProbability": round(float(fail_prob), 2),
+        "trend": "declining" if slope < -0.2 else "stable",
+        "predictedIn": f"{abs(int(scores[-1]/(slope*4)))}h" if slope < -0.5 else "Stable",
+        "weakestComponent": weakest.replace("Score", "")
+    }
+
+@app.post("/detect")
+async def detect(data: dict = Body(...)):
+    """
+    Detects abnormal behavior using the Z-Score formula.
+    """
+    window = data.get("currentWindow", {})
+    baseline = data.get("historicalBaseline", {})
+    recent_logs = data.get("recentLogs", [])
+
+    curr = window.get("errorRate", 0)
+    mean = baseline.get("meanErrorRate", 0.1)
+    std = baseline.get("stdDevErrorRate", 0.05)
+    
+    z_score = (curr - mean) / std if std > 0 else 0
+    
+    event_codes = [l.get("eventCode") for l in recent_logs]
+    anomaly_type = "RAPID_FAILURES"
+    if "MALWARE_SIGNATURE" in event_codes:
+        anomaly_type = "MALWARE_PATTERN"
+    elif "CARD_READ_ERROR" in event_codes and "MALWARE_SIGNATURE" in event_codes:
+        anomaly_type = "CARD_SKIMMING"
+
+    return {
+        "isAnomaly": z_score > 3.0 or anomaly_type != "RAPID_FAILURES",
+        "zScore": round(float(z_score), 2),
+        "anomalyType": anomaly_type,
+        "confidenceScore": min(1.0, round(float(z_score/5), 2)),
+        "explanation": f"Error rate is {round(z_score, 1)} standard deviations from baseline."
+    }
+
+if _name_ == "_main_":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
