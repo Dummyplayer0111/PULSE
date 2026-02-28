@@ -110,6 +110,6 @@ async def detect(data: dict = Body(...)):
         "explanation": f"Error rate is {round(z_score, 1)} standard deviations from baseline."
     }
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
