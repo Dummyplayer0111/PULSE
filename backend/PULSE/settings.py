@@ -126,8 +126,17 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Channel layers — in-memory for development
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
+
 # CORS — allow the Vite dev server
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
 ]

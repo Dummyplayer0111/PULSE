@@ -266,3 +266,78 @@ class SelfHealAction(models.Model):
     result = models.TextField(null=True, blank=True)
 
     createdAt = models.DateTimeField(default=timezone.now)
+
+
+# ─────────────────────────────────────────────
+# ATM
+# ─────────────────────────────────────────────
+
+ATM_STATUS_CHOICES = [
+    ("ONLINE", "ONLINE"),
+    ("OFFLINE", "OFFLINE"),
+    ("DEGRADED", "DEGRADED"),
+    ("MAINTENANCE", "MAINTENANCE"),
+]
+
+class ATM(models.Model):
+    name            = models.CharField(max_length=100)
+    location        = models.CharField(max_length=255)
+    address         = models.CharField(max_length=500, blank=True, default='')
+    region          = models.CharField(max_length=100, blank=True, default='')
+    model           = models.CharField(max_length=100, blank=True, default='')
+    serialNumber    = models.CharField(max_length=100, blank=True, default='')
+    status          = models.CharField(max_length=20, choices=ATM_STATUS_CHOICES, default='ONLINE')
+    healthScore     = models.FloatField(default=100.0)
+    networkScore    = models.FloatField(default=100.0)
+    hardwareScore   = models.FloatField(default=100.0)
+    softwareScore   = models.FloatField(default=100.0)
+    transactionScore= models.FloatField(default=100.0)
+    latitude        = models.FloatField(null=True, blank=True)
+    longitude       = models.FloatField(null=True, blank=True)
+    lastSeen        = models.DateTimeField(default=timezone.now)
+    createdAt       = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return self.name
+
+
+# ─────────────────────────────────────────────
+# PAYMENT CHANNEL
+# ─────────────────────────────────────────────
+
+class PaymentChannel(models.Model):
+    name    = models.CharField(max_length=100)
+    type    = models.CharField(max_length=50)
+    status  = models.CharField(max_length=20, default='ONLINE')
+    endpoint= models.URLField(blank=True, default='')
+    createdAt = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return self.name
+
+
+# ─────────────────────────────────────────────
+# CUSTOMER NOTIFICATION
+# ─────────────────────────────────────────────
+
+class CustomerNotification(models.Model):
+    recipientId = models.CharField(max_length=255)
+    channel     = models.CharField(max_length=20, default='SMS')
+    message     = models.TextField()
+    language    = models.CharField(max_length=10, default='en')
+    status      = models.CharField(max_length=20, default='SENT')
+    createdAt   = models.DateTimeField(default=timezone.now)
+
+
+# ─────────────────────────────────────────────
+# MESSAGE TEMPLATE
+# ─────────────────────────────────────────────
+
+class MessageTemplate(models.Model):
+    name     = models.CharField(max_length=100)
+    language = models.CharField(max_length=10, default='en')
+    body     = models.TextField()
+    createdAt= models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return self.name

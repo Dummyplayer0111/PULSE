@@ -10,7 +10,7 @@ export const pulseApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Incidents', 'Logs', 'Anomalies', 'SelfHealActions', 'Notifications', 'Templates'],
+  tagTypes: ['Incidents', 'Logs', 'Anomalies', 'SelfHealActions', 'Notifications', 'Templates', 'ATMs'],
   endpoints: (builder) => ({
 
     // ── AUTH ──────────────────────────────────────────────────
@@ -22,7 +22,7 @@ export const pulseApi = createApi({
     getHealthOverview:   builder.query<any, void>({ query: () => 'dashboard/health-overview/' }),
 
     // ── ATMs ──────────────────────────────────────────────────
-    getATMs:             builder.query<any[], void>({            query: ()   => 'atms/' }),
+    getATMs:             builder.query<any[], void>({            query: ()   => 'atms/', providesTags: ['ATMs'] }),
     getATM:              builder.query<any, string | number>({   query: (id) => `atms/${id}/` }),
     getATMLogs:          builder.query<any[], string | number>({ query: (id) => `atms/${id}/logs/` }),
     getATMIncidents:     builder.query<any[], string | number>({ query: (id) => `atms/${id}/incidents/` }),
@@ -79,6 +79,7 @@ export const pulseApi = createApi({
     // ── SELF-HEAL ─────────────────────────────────────────────
     getSelfHealActions: builder.query<any[], void>({
       query: () => 'self-heal/actions/',
+      transformResponse: (res: any) => res.actions ?? res ?? [],
       providesTags: ['SelfHealActions'],
     }),
     triggerSelfHeal: builder.mutation<any, object>({
@@ -95,6 +96,12 @@ export const pulseApi = createApi({
       query: ({ id, body }) => ({ url: `anomaly/flags/${id}/`, method: 'PATCH', body }),
       invalidatesTags: ['Anomalies'],
     }),
+
+    // ── SIMULATOR ─────────────────────────────────────────────
+    startSimulator:     builder.mutation<any, void>({ query: () => ({ url: 'simulator/start/',  method: 'POST' }) }),
+    stopSimulator:      builder.mutation<any, void>({ query: () => ({ url: 'simulator/stop/',   method: 'POST' }) }),
+    getSimulatorStatus: builder.query<any, void>({   query: () => 'simulator/status/' }),
+    resetAtmHealth:     builder.mutation<any, number>({ query: (id) => ({ url: `atms/${id}/reset-health/`, method: 'POST' }), invalidatesTags: ['ATMs'] }),
 
     // ── NOTIFICATIONS ─────────────────────────────────────────
     getNotifications: builder.query<any[], void>({
@@ -141,6 +148,10 @@ export const {
   useTriggerSelfHealMutation,
   useGetAnomalyFlagsQuery,
   useUpdateAnomalyFlagMutation,
+  useStartSimulatorMutation,
+  useStopSimulatorMutation,
+  useGetSimulatorStatusQuery,
+  useResetAtmHealthMutation,
   useGetNotificationsQuery,
   useSendNotificationMutation,
   useGetTemplatesQuery,

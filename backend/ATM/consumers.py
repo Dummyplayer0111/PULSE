@@ -4,15 +4,35 @@ import json
 
 class DashboardConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        await self.channel_layer.group_add('dashboard', self.channel_name)
         await self.accept()
 
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard('dashboard', self.channel_name)
+
     async def receive(self, text_data):
-        await self.send(text_data=json.dumps({"message": "Live Dashboard"}))
+        pass  # client → server messages not needed
+
+    # Called by channel_layer.group_send(type='atm_update')
+    async def atm_update(self, event):
+        await self.send(text_data=json.dumps(event['data']))
+
+    # Called by channel_layer.group_send(type='pipeline_event')
+    async def pipeline_event(self, event):
+        await self.send(text_data=json.dumps(event['data']))
 
 
 class LogConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        self.atm_id = self.scope['url_route']['kwargs']['atm_id']
+        await self.channel_layer.group_add(f'logs_{self.atm_id}', self.channel_name)
         await self.accept()
 
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(f'logs_{self.atm_id}', self.channel_name)
+
     async def receive(self, text_data):
-        await self.send(text_data=json.dumps({"log": "Live Log Stream"}))
+        pass
+
+    async def log_entry(self, event):
+        await self.send(text_data=json.dumps(event['data']))

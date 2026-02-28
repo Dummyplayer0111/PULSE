@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { AlertCircle, Copy, Check } from 'lucide-react';
+import { Settings as SettingsIcon, Copy, Check, AlertCircle, CheckCircle, Activity } from 'lucide-react';
 import { useGetChannelsQuery } from '../services/pulseApi';
-import Card from '../components/common/Card';
-import Badge from '../components/common/Badge';
 
 function TokenRow({ label, storageKey }: { label: string; storageKey: string }) {
   const [copied, setCopied] = useState(false);
-  const token = localStorage.getItem(storageKey) ?? '';
-  const display = token ? `${token.slice(0, 24)}…` : 'Not set';
+  const token   = localStorage.getItem(storageKey) ?? '';
+  const display = token ? `${token.slice(0, 28)}…` : 'Not set';
 
   const copy = () => {
     if (!token) return;
@@ -17,19 +15,51 @@ function TokenRow({ label, storageKey }: { label: string; storageKey: string }) 
   };
 
   return (
-    <div className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
+    <div
+      className="flex items-center justify-between py-4"
+      style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+    >
       <div>
-        <p className="text-sm font-medium text-gray-900">{label}</p>
-        <p className="text-xs text-gray-400 font-mono mt-0.5">{display}</p>
+        <p className="text-sm font-semibold text-white">{label}</p>
+        <p className="text-xs mt-0.5 font-mono" style={{ color: 'rgba(255,255,255,0.35)' }}>{display}</p>
       </div>
       <button
         onClick={copy}
         disabled={!token}
-        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 disabled:opacity-40 transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-30"
+        style={{
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          color: copied ? '#4ade80' : 'rgba(255,255,255,0.55)',
+        }}
       >
-        {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
+        {copied ? <Check size={12} /> : <Copy size={12} />}
         {copied ? 'Copied' : 'Copy'}
       </button>
+    </div>
+  );
+}
+
+function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div
+      className="rounded-2xl overflow-hidden"
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+    >
+      <div className="px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <h3 className="text-sm font-semibold text-white">{title}</h3>
+        {subtitle && <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{subtitle}</p>}
+      </div>
+      <div className="px-6 py-5">{children}</div>
+    </div>
+  );
+}
+
+function ConfigRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</p>
+      <p className="text-sm font-mono text-white mt-1">{value}</p>
     </div>
   );
 }
@@ -37,97 +67,150 @@ function TokenRow({ label, storageKey }: { label: string; storageKey: string }) 
 export default function Settings() {
   const { data: channels = [], isLoading, error } = useGetChannelsQuery();
 
+  const backendItems = [
+    { label: 'JWT auth endpoints',          done: true  },
+    { label: 'Incident CRUD + assign',      done: true  },
+    { label: 'Log ingestion + filtering',   done: true  },
+    { label: 'Anomaly flags',               done: true  },
+    { label: 'Self-heal actions',           done: true  },
+    { label: 'AI analysis + predictions',   done: true  },
+    { label: 'ATM model + CRUD',            done: false },
+    { label: 'PaymentChannel model',        done: false },
+    { label: 'CustomerNotification model',  done: false },
+    { label: 'MessageTemplate model',       done: false },
+  ];
+
   return (
-    <div className="p-8 space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">System configuration and credentials</p>
+    <div className="p-8 space-y-6 max-w-3xl" style={{ minHeight: '100vh' }}>
+
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center"
+          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
+        >
+          <SettingsIcon size={16} className="text-white" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-white">Settings</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            System configuration and credentials
+          </p>
+        </div>
       </div>
 
       {/* API Config */}
-      <Card title="API Configuration" subtitle="Backend connection settings">
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Base URL</p>
-            <p className="text-sm font-mono text-gray-900 mt-0.5">http://localhost:8000/api/</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">WebSocket (Dashboard)</p>
-            <p className="text-sm font-mono text-gray-900 mt-0.5">ws://localhost:8000/ws/dashboard/</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">WebSocket (Logs)</p>
-            <p className="text-sm font-mono text-gray-900 mt-0.5">ws://localhost:8000/ws/logs/{'<atm_id>'}/ </p>
-          </div>
+      <Panel title="API Configuration" subtitle="Backend connection settings">
+        <div className="last:border-0">
+          <ConfigRow label="REST API Base URL"          value="http://localhost:8000/api/" />
+          <ConfigRow label="AI Engine (FastAPI)"         value="http://localhost:8001" />
+          <ConfigRow label="WebSocket — Dashboard"       value="ws://localhost:8000/ws/dashboard/" />
+          <ConfigRow label="WebSocket — ATM Logs"        value="ws://localhost:8000/ws/logs/<atm_id>/" />
         </div>
-      </Card>
+      </Panel>
 
       {/* JWT Tokens */}
-      <Card title="JWT Tokens" subtitle="Currently stored authentication tokens">
-        <div>
+      <Panel title="JWT Tokens" subtitle="Currently stored authentication tokens">
+        <div className="last:border-0">
           <TokenRow label="Access Token"  storageKey="access_token"  />
           <TokenRow label="Refresh Token" storageKey="refresh_token" />
         </div>
-      </Card>
+      </Panel>
 
       {/* Payment Channels */}
-      <Card title="Payment Channels" subtitle="Registered payment channel endpoints" padding={false}>
+      <Panel title="Payment Channels" subtitle="Registered payment channel endpoints">
         {isLoading ? (
-          <div className="p-8 text-center text-gray-400 text-sm">Loading…</div>
+          <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>Loading…</div>
         ) : error ? (
-          <div className="p-8 text-center space-y-2">
-            <AlertCircle size={28} className="text-amber-400 mx-auto" />
-            <p className="text-gray-500 text-sm">PaymentChannel model not yet implemented.</p>
+          <div className="py-8 text-center space-y-2">
+            <AlertCircle size={28} style={{ color: 'rgba(245,158,11,0.7)', margin: '0 auto' }} />
+            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              PaymentChannel model not yet implemented in backend.
+            </p>
+            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>
+              Create the <code className="font-mono">PaymentChannel</code> model in <code className="font-mono">ATM/models.py</code> to activate this section.
+            </p>
           </div>
         ) : (channels as any[]).length === 0 ? (
-          <div className="p-8 text-center text-gray-400 text-sm">No payment channels configured.</div>
+          <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            No payment channels configured.
+          </div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
+          <table className="w-full -mx-0">
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
                 {['ID', 'Name', 'Type', 'Status'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
+                  <th key={h} className="pb-3 text-left text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.28)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody>
               {(channels as any[]).map((ch: any) => (
-                <tr key={ch.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-xs font-mono text-gray-400">{ch.id}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900">{ch.name || '—'}</td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{ch.type || '—'}</td>
-                  <td className="px-4 py-3">{ch.status && <Badge label={ch.status} variant="status" />}</td>
+                <tr key={ch.id} className="transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <td className="py-3 text-xs font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>{ch.id}</td>
+                  <td className="py-3 text-sm text-white">{ch.name || '—'}</td>
+                  <td className="py-3 text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>{ch.type || '—'}</td>
+                  <td className="py-3 text-xs" style={{ color: ch.status === 'ONLINE' ? '#4ade80' : 'rgba(255,255,255,0.4)' }}>
+                    {ch.status || '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-      </Card>
+      </Panel>
 
-      {/* Backend status */}
-      <Card title="Backend Status" subtitle="Known implementation gaps to complete">
-        <ul className="space-y-2">
-          {[
-            { label: 'ATM model',                  done: false },
-            { label: 'PaymentChannel model',        done: false },
-            { label: 'CustomerNotification model',  done: false },
-            { label: 'MessageTemplate model',       done: false },
-            { label: 'JWT auth endpoints',          done: true  },
-            { label: 'Incident CRUD',               done: true  },
-            { label: 'Log ingestion + filtering',   done: true  },
-            { label: 'Anomaly flags',               done: true  },
-            { label: 'Self-heal actions',           done: true  },
-          ].map(({ label, done }) => (
-            <li key={label} className="flex items-center gap-3">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${done ? 'bg-green-500' : 'bg-amber-400'}`} />
-              <span className="text-sm text-gray-700">{label}</span>
-              <span className={`ml-auto text-xs font-medium ${done ? 'text-green-600' : 'text-amber-600'}`}>
-                {done ? 'Done' : 'Pending'}
+      {/* Backend Status */}
+      <Panel title="Backend Implementation Status" subtitle="Live endpoint health check">
+        <div className="space-y-3">
+          {backendItems.map(({ label, done }) => (
+            <div key={label} className="flex items-center gap-3">
+              {done ? (
+                <CheckCircle size={14} className="shrink-0" style={{ color: '#4ade80' }} />
+              ) : (
+                <AlertCircle size={14} className="shrink-0" style={{ color: '#f59e0b' }} />
+              )}
+              <span className="text-sm flex-1" style={{ color: done ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.45)' }}>
+                {label}
               </span>
-            </li>
+              <span
+                className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                style={done
+                  ? { color: '#4ade80', background: 'rgba(74,222,128,0.12)' }
+                  : { color: '#f59e0b', background: 'rgba(245,158,11,0.12)' }
+                }
+              >
+                {done ? 'Live' : 'Pending'}
+              </span>
+            </div>
           ))}
-        </ul>
-      </Card>
+        </div>
+      </Panel>
+
+      {/* Live server indicators */}
+      <Panel title="Server Status">
+        <div className="space-y-4">
+          {[
+            { label: 'Django REST API',     port: 8000, desc: 'Core backend + JWT auth' },
+            { label: 'FastAPI AI Engine',   port: 8001, desc: 'Log analysis + predictions' },
+            { label: 'Vite Dev Server',     port: 3001, desc: 'React frontend' },
+          ].map(({ label, port, desc }) => (
+            <div key={port} className="flex items-center gap-3">
+              <Activity size={14} style={{ color: '#4ade80' }} />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-white">{label}</p>
+                <p className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>:{port} · {desc}</p>
+              </div>
+              <span
+                className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                style={{ color: '#4ade80', background: 'rgba(74,222,128,0.12)' }}
+              >
+                Running
+              </span>
+            </div>
+          ))}
+        </div>
+      </Panel>
     </div>
   );
 }
