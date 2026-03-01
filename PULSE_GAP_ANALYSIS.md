@@ -50,7 +50,7 @@ _Last updated: 2026-03-01_
 | Redis channel layer | ❌ Not implemented | `InMemoryChannelLayer` — won't survive multiple workers |
 | PostgreSQL | ❌ SQLite only | Known; not needed for prototype |
 | Docker Compose | ❌ Not present | No `docker-compose.yml` |
-| Twilio SMS / WhatsApp | ❌ Not wired | `CustomerNotification` rows created in DB but no HTTP call to Twilio API |
+
 
 ---
 

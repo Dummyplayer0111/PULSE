@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import type { RootState } from '../store';
+import { clearAuth } from '../store/authSlice';
 import {
   LayoutDashboard, Map, AlertTriangle, Brain,
   ShieldAlert, MessageSquare, Settings, LogOut, Activity, ScrollText,
-  Sun, Moon,
+  Sun, Moon, Wrench,
 } from 'lucide-react';
 
-const NAV = [
+const ADMIN_NAV = [
   { to: '/dashboard',      label: 'Dashboard',      Icon: LayoutDashboard },
   { to: '/atm-map',        label: 'ATM Network',    Icon: Map             },
   { to: '/logs',           label: 'Logs',           Icon: ScrollText      },
@@ -17,6 +20,11 @@ const NAV = [
   { to: '/settings',       label: 'Settings',       Icon: Settings        },
 ];
 
+const ENGINEER_NAV = [
+  { to: '/engineer',   label: 'My Incidents', Icon: Wrench        },
+  { to: '/incidents',  label: 'All Incidents', Icon: AlertTriangle },
+];
+
 function getInitialTheme(): 'dark' | 'light' {
   const stored = localStorage.getItem('pulse-theme') as 'dark' | 'light' | null;
   if (stored === 'dark' || stored === 'light') return stored;
@@ -25,8 +33,12 @@ function getInitialTheme(): 'dark' | 'light' {
 }
 
 export default function Layout() {
-  const navigate = useNavigate();
-  const token = localStorage.getItem('access_token');
+  const navigate  = useNavigate();
+  const dispatch  = useDispatch();
+  const auth      = useSelector((s: RootState) => s.auth);
+  const token     = localStorage.getItem('access_token');
+  const isEngineer = auth.role === 'ENGINEER';
+  const NAV        = isEngineer ? ENGINEER_NAV : ADMIN_NAV;
 
   const [theme, setTheme] = useState<'dark' | 'light'>(getInitialTheme);
 
@@ -48,8 +60,7 @@ export default function Layout() {
   });
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+    dispatch(clearAuth());
     navigate('/login');
   };
 
@@ -191,12 +202,14 @@ export default function Layout() {
                 border: '1px solid var(--p-logo-border)',
               }}
             >
-              A
+              {(auth.username || 'A')[0].toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold truncate leading-none" style={{ color: 'var(--p-sidebar-text)' }}>Admin</p>
+              <p className="text-xs font-semibold truncate leading-none" style={{ color: 'var(--p-sidebar-text)' }}>
+                {auth.username || 'User'}
+              </p>
               <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--p-sidebar-label)' }}>
-                Operations
+                {auth.role || 'Operations'}
               </p>
             </div>
             <span

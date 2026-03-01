@@ -172,16 +172,35 @@ def _recalculate_health_score(source_id, source_type):
 
 # ── Customer notification dispatch ────────────────────────────────────────────
 
-def _dispatch_customer_notifications(incident):
+def _dispatch_customer_notifications(incident, atm=None):
     """
-    Auto-create CustomerNotification rows for the incident.
-    Language auto-selected: English + Tamil for demo (spec §10 logic).
+    Detect the customer's regional language from the ATM location, pick the
+    matching MessageTemplate, and send a real SMS via Twilio.
+
+    Sends two messages per incident:
+      1. Regional language (ta/mr/bn/kn/te/gu/hi) — customer's native tongue
+      2. English — universal fallback (skipped when region is already 'en')
+
+    A CustomerNotification row is created for each, with status reflecting the
+    actual Twilio response: SENT / FAILED / SKIPPED.
     """
     from .models import MessageTemplate, CustomerNotification
+    from .twilio_service import detect_language, send_sms, DEMO_PHONE
 
     template_key = TEMPLATE_KEY_MAP.get(incident.rootCauseCategory, 'atm_offline')
 
-    for lang in ('en', 'ta'):
+    # Detect language from ATM region/location
+    regional_lang = detect_language(atm) if atm else 'en'
+
+    # Send regional first, then English (unless region IS English)
+    langs_to_send = [regional_lang] if regional_lang == 'en' else [regional_lang, 'en']
+
+    # In demo mode every SMS goes to the configured demo phone.
+    # In production this would be the customer's registered mobile from the transaction.
+    # If DEMO_CUSTOMER_PHONE is not set, send_sms() will SKIPPED gracefully.
+    recipient = DEMO_PHONE or ''
+
+    for lang in langs_to_send:
         tmpl = MessageTemplate.objects.filter(
             templateKey=template_key, language=lang, channel='SMS',
         ).first()
@@ -190,12 +209,15 @@ def _dispatch_customer_notifications(incident):
 
         msg_text = tmpl.body.replace('{atm_id}', incident.incidentId)
 
+        # --- Actually call Twilio ---
+        result = send_sms(recipient, msg_text)
+
         CustomerNotification.objects.create(
-            recipientId=f'+91-DEMO-{lang.upper()}',
+            recipientId=recipient,
             channel='SMS',
             message=msg_text,
             language=lang,
-            status='SENT',
+            status=result.get('status', 'SKIPPED'),
             incidentDbId=incident.id,
             messageTemplateId=tmpl.id,
             messageSent=msg_text,
@@ -299,6 +321,34 @@ def _broadcast_pipeline_event(log_entry, classification, incident, heal_action):
         pass
 
 
+# ── Auto-assign to least-loaded engineer ──────────────────────────────────────
+
+def _auto_assign_engineer(incident):
+    """
+    Pick the ENGINEER with the fewest open/investigating incidents and assign them.
+    Returns the chosen username or None if no engineers exist.
+    """
+    from .models import UserProfile, Incident as Inc
+
+    engineers = list(
+        UserProfile.objects.filter(role='ENGINEER').select_related('user')
+    )
+    if not engineers:
+        return None
+
+    def load(profile):
+        return Inc.objects.filter(
+            assignedTo=profile.user.username,
+            status__in=['OPEN', 'INVESTIGATING'],
+        ).count()
+
+    chosen = min(engineers, key=load)
+    incident.assignedTo = chosen.user.username
+    incident.status     = 'INVESTIGATING'
+    incident.save(update_fields=['assignedTo', 'status'])
+    return chosen.user.username
+
+
 # ── Main pipeline entry point ─────────────────────────────────────────────────
 
 def process_log(log_entry_id):
@@ -378,6 +428,9 @@ def process_log(log_entry_id):
                 contributingLogIds=[log_entry.id],
             )
 
+            # Auto-assign to least-loaded engineer (skipped if none exist)
+            _auto_assign_engineer(incident)
+
             # ── STEP 4: Health Score Recalculated ─────────────────────────────
             new_score = _recalculate_health_score(log_entry.sourceId, log_entry.sourceType)
             if atm:
@@ -446,11 +499,22 @@ def process_log(log_entry_id):
                 sentAt=timezone.now(),
             )
 
-            # ── STEP 7: Customer Notification ─────────────────────────────────
-            try:
-                _dispatch_customer_notifications(incident)
-            except Exception:
-                pass
+            # ── STEP 7: Customer Notification (Twilio SMS) ────────────────────────
+            # Only notify customer for incidents that directly impact their transaction
+            # (HIGH/CRITICAL severity + categories visible to end users).
+            # LOW network blips and auto-resolved events don't warrant an SMS.
+            NOTIFY_CATEGORIES = {'CASH_JAM', 'FRAUD', 'HARDWARE', 'NETWORK', 'TIMEOUT'}
+            NOTIFY_SEVERITIES  = {'HIGH', 'CRITICAL'}
+            should_notify = (
+                severity in NOTIFY_SEVERITIES
+                and category in NOTIFY_CATEGORIES
+                and incident.status != 'AUTO_RESOLVED'
+            )
+            if should_notify:
+                try:
+                    _dispatch_customer_notifications(incident, atm=atm)
+                except Exception:
+                    pass
 
     # INFO events: gradually recover ATM health
     elif log_entry.logLevel == 'INFO' and atm and atm.healthScore < 98:

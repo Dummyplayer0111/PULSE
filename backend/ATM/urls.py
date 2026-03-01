@@ -56,4 +56,7 @@ urlpatterns = [
 
     # PIPELINE FEED (REST fallback for live feed)
     path('pipeline/events/',   views.recent_pipeline_events),
+
+    # USERS
+    path('users/engineers/',   views.list_engineers),
 ]

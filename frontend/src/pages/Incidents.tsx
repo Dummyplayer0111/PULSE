@@ -4,6 +4,7 @@ import {
   useGetIncidentsQuery,
   useAssignIncidentMutation,
   useResolveIncidentMutation,
+  useGetEngineersQuery,
 } from '../services/pulseApi';
 import Modal from '../components/common/Modal';
 import { formatDate, formatDateTime, shortId } from '../utils';
@@ -312,6 +313,7 @@ export default function Incidents() {
   const { data: incidents = [], isLoading } = useGetIncidentsQuery(undefined, { pollingInterval: 5000 });
   const [assignIncident, { isLoading: assigning }] = useAssignIncidentMutation();
   const [resolveIncident, { isLoading: resolving }] = useResolveIncidentMutation();
+  const { data: engineers = [] } = useGetEngineersQuery();
 
   const [search,     setSearch]     = useState('');
   const [sevFilter,  setSevFilter]  = useState('All');
@@ -337,14 +339,14 @@ export default function Incidents() {
 
   const handleAssign = async () => {
     if (!assignId) return;
-    await assignIncident({ id: assignId, body: { assigned_to: assignedTo, priority } });
+    await assignIncident({ id: assignId, body: { username: assignedTo, priority } });
     setAssignId(null);
     setAssignedTo('');
   };
 
   const openAssign = (inc: any) => {
     setAssignId(inc.id);
-    setAssignedTo(inc.assignedTo || inc.assigned_to || '');
+    setAssignedTo(inc.assignedTo || '');
     setPriority(inc.priority || 'MEDIUM');
   };
 
@@ -559,16 +561,32 @@ export default function Incidents() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              Assigned To
+              Assign To Engineer
             </label>
-            <input
-              type="text"
-              value={assignedTo}
-              onChange={e => setAssignedTo(e.target.value)}
-              placeholder="Engineer name or team"
-              className="w-full px-3 py-2.5"
-              style={inputStyle}
-            />
+            {engineers.length > 0 ? (
+              <select
+                value={assignedTo}
+                onChange={e => setAssignedTo(e.target.value)}
+                className="w-full px-3 py-2.5"
+                style={{ ...inputStyle, cursor: 'pointer' }}
+              >
+                <option value="" style={{ background: '#1a1a22' }}>— Select engineer —</option>
+                {engineers.map((eng: any) => (
+                  <option key={eng.username} value={eng.username} style={{ background: '#1a1a22' }}>
+                    {eng.fullName || eng.username} ({eng.username})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={assignedTo}
+                onChange={e => setAssignedTo(e.target.value)}
+                placeholder="Engineer username"
+                className="w-full px-3 py-2.5"
+                style={inputStyle}
+              />
+            )}
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>

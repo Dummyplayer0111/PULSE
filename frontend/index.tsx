@@ -2,18 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { motion } from 'motion/react';
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { Provider } from 'react-redux';
+import { Provider, useDispatch } from 'react-redux';
 import { store } from './src/store';
-import Layout          from './src/components/Layout';
-import Dashboard       from './src/pages/Dashboard';
-import ATMMapPage      from './src/pages/ATMMap';
-import ATMDetail       from './src/pages/ATMDetail';
-import Incidents       from './src/pages/Incidents';
-import AIAnalysis      from './src/pages/AIAnalysis';
-import Anomaly         from './src/pages/Anomaly';
-import Communications  from './src/pages/Communications';
-import Settings        from './src/pages/Settings';
-import Logs            from './src/pages/Logs';
+import { setAuth } from './src/store/authSlice';
+import Layout              from './src/components/Layout';
+import Dashboard           from './src/pages/Dashboard';
+import ATMMapPage          from './src/pages/ATMMap';
+import ATMDetail           from './src/pages/ATMDetail';
+import Incidents           from './src/pages/Incidents';
+import AIAnalysis          from './src/pages/AIAnalysis';
+import Anomaly             from './src/pages/Anomaly';
+import Communications      from './src/pages/Communications';
+import Settings            from './src/pages/Settings';
+import Logs                from './src/pages/Logs';
+import EngineerDashboard   from './src/pages/EngineerDashboard';
 import { Brain, Zap, ShieldAlert, Globe, Activity, TrendingUp, ArrowRight, ChevronRight } from 'lucide-react';
 
 // ─── GLOW CARD (Stripe-style hover) ──────────────────────────────────────────
@@ -767,7 +769,8 @@ function LoginPage() {
   const [shake, setShake]       = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [locked, setLocked]     = useState(false);
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
+  const dispatch  = useDispatch();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -782,7 +785,21 @@ function LoginPage() {
       if (res.ok) {
         localStorage.setItem('access_token', data.access);
         localStorage.setItem('refresh_token', data.refresh);
-        navigate('/dashboard');
+        // Fetch role from /api/auth/me/
+        try {
+          const meRes = await fetch('http://localhost:8000/api/auth/me/', {
+            headers: { 'Authorization': `Bearer ${data.access}` },
+          });
+          if (meRes.ok) {
+            const me = await meRes.json();
+            dispatch(setAuth({ username: me.username, role: me.role, email: me.email }));
+            navigate(me.role === 'ENGINEER' ? '/engineer' : '/dashboard');
+          } else {
+            navigate('/dashboard');
+          }
+        } catch {
+          navigate('/dashboard');
+        }
       } else {
         const n = attempts + 1; setAttempts(n);
         const msg = data?.detail || data?.non_field_errors?.[0] || 'Invalid credentials. Please try again.';
@@ -985,6 +1002,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<Layout />}>
             <Route path="/dashboard"      element={<Dashboard />} />
+            <Route path="/engineer"       element={<EngineerDashboard />} />
             <Route path="/atm-map"        element={<ATMMapPage />} />
             <Route path="/atm-detail/:id" element={<ATMDetail />} />
             <Route path="/logs"           element={<Logs />} />

@@ -50,6 +50,18 @@ export const pulseApi = createApi({
     // ── AUTH ──────────────────────────────────────────────────
     // POST /api/auth/login/    → handled outside RTK Query (LandingPage / LoginPage)
     // POST /api/auth/refresh/  → handled outside RTK Query
+    getMe:        builder.query<{ username: string; email: string; role: string }, void>({ query: () => 'auth/me/' }),
+    getEngineers: builder.query<{ username: string; fullName: string }[], void>({ query: () => 'users/engineers/' }),
+    getMyIncidents: builder.query<any[], { assigned_to?: string; status?: string } | void>({
+      query: (params) => {
+        const p = new URLSearchParams();
+        if (params && params.assigned_to) p.set('assigned_to', params.assigned_to);
+        if (params && params.status)      p.set('status',      params.status);
+        const qs = p.toString();
+        return qs ? `incidents/?${qs}` : 'incidents/';
+      },
+      providesTags: ['Incidents'],
+    }),
 
     // ── DASHBOARD ─────────────────────────────────────────────
     getDashboardSummary: builder.query<any, void>({ query: () => 'dashboard/summary/' }),
@@ -164,6 +176,9 @@ export const pulseApi = createApi({
 });
 
 export const {
+  useGetMeQuery,
+  useGetEngineersQuery,
+  useGetMyIncidentsQuery,
   useGetDashboardSummaryQuery,
   useGetHealthOverviewQuery,
   useGetATMsQuery,

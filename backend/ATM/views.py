@@ -10,16 +10,48 @@ from channels.layers import get_channel_layer
 from django.db.models import Avg, Count
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .models import (
     ATM, Alert, AnomalyFlag, CustomerNotification, HealthSnapshot,
     Incident, LogEntry, MessageTemplate, PaymentChannel, SelfHealAction,
+    UserProfile,
 )
 from .pipeline import _broadcast_atm, process_log
 
 channel_layer = get_channel_layer()
+
+
+# ─────────────────────────────────────────────
+# AUTH / USER
+# ─────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def auth_me(request):
+    try:
+        role = request.user.profile.role
+    except UserProfile.DoesNotExist:
+        role = 'ADMIN'
+    return Response({
+        'username': request.user.username,
+        'email':    request.user.email,
+        'role':     role,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_engineers(request):
+    profiles = UserProfile.objects.filter(role='ENGINEER').select_related('user')
+    return Response([
+        {
+            'username': p.user.username,
+            'fullName': p.fullName or p.user.get_full_name() or p.user.username,
+        }
+        for p in profiles
+    ])
 
 
 # ─────────────────────────────────────────────
@@ -452,7 +484,14 @@ def log_list(request):
 
 @api_view(['GET'])
 def incident_list(request):
-    return Response(list(Incident.objects.all().order_by('-createdAt').values()))
+    qs = Incident.objects.all().order_by('-createdAt')
+    assigned_to = request.query_params.get('assigned_to')
+    status      = request.query_params.get('status')
+    if assigned_to:
+        qs = qs.filter(assignedTo=assigned_to)
+    if status:
+        qs = qs.filter(status=status)
+    return Response(list(qs.values()))
 
 
 @api_view(['GET', 'PATCH'])
@@ -473,7 +512,7 @@ def incident_detail(request, id):
 def assign_incident(request, id):
     try:
         incident = Incident.objects.get(id=id)
-        incident.assignedTo = request.data.get('userId')
+        incident.assignedTo = request.data.get('username') or request.data.get('userId')
         incident.status = 'INVESTIGATING'
         incident.save()
         return Response({"assigned": True, "id": id})

@@ -1,6 +1,7 @@
 from django.db import models
 import uuid
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 
 
@@ -114,7 +115,7 @@ class Incident(models.Model):
 
     rootCauseDetail = models.TextField(blank=True, default='')
     resolvedAt = models.DateTimeField(null=True, blank=True)
-    assignedTo = models.UUIDField(null=True, blank=True)
+    assignedTo = models.CharField(max_length=150, null=True, blank=True)
 
     createdAt = models.DateTimeField(default=timezone.now)
 
@@ -376,3 +377,21 @@ class MessageTemplate(models.Model):
 
     def __str__(self):
         return f"{self.templateKey}/{self.language}/{self.channel}"
+
+
+# ─────────────────────────────────────────────
+# USER PROFILE
+# ─────────────────────────────────────────────
+
+ROLE_CHOICES = [
+    ("ADMIN", "ADMIN"),
+    ("ENGINEER", "ENGINEER"),
+]
+
+class UserProfile(models.Model):
+    user     = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    role     = models.CharField(max_length=20, choices=ROLE_CHOICES, default='ENGINEER')
+    fullName = models.CharField(max_length=255, blank=True, default='')
+
+    def __str__(self):
+        return f"{self.user.username} ({self.role})"
