@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
@@ -19,27 +19,33 @@ const STATUS_COLOR: Record<string, string> = {
 const INDIA_BOUNDS: L.LatLngBoundsExpression = [[6.5, 68.0], [35.7, 97.5]];
 const INDIA_CENTER: L.LatLngExpression = [22.0, 82.5];
 
-function makeIcon(status: string, isSelected: boolean) {
+function makeIcon(status: string, isSelected: boolean, hasIncident = false) {
   const color = STATUS_COLOR[status] ?? '#6b7280';
   const size  = isSelected ? 44 : 36;
+  const ring  = hasIncident
+    ? `<div class="atm-incident-ring" style="color:${color};"></div>`
+    : '';
   const html  = `
-    <div style="
-      width:${size}px;height:${size}px;
-      background:rgba(14,14,20,0.92);
-      border:2px solid ${color};
-      border-radius:50% 50% 50% 4px;
-      transform:rotate(-45deg);
-      display:flex;align-items:center;justify-content:center;
-      box-shadow:0 0 0 3px ${color}30, 0 4px 16px rgba(0,0,0,0.6);
-      transition:all 0.2s;
-    ">
+    <div style="position:relative;width:${size}px;height:${size}px;">
+      ${ring}
       <div style="
-        transform:rotate(45deg);
-        width:10px;height:10px;
-        border-radius:50%;
-        background:${color};
-        box-shadow:0 0 6px ${color};
-      "></div>
+        width:${size}px;height:${size}px;
+        background:rgba(14,14,20,0.92);
+        border:2px solid ${color};
+        border-radius:50% 50% 50% 4px;
+        transform:rotate(-45deg);
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:0 0 0 3px ${color}30, 0 4px 16px rgba(0,0,0,0.6);
+        transition:all 0.2s;
+      ">
+        <div style="
+          transform:rotate(45deg);
+          width:10px;height:10px;
+          border-radius:50%;
+          background:${color};
+          box-shadow:0 0 6px ${color};
+        "></div>
+      </div>
     </div>`;
   return L.divIcon({ html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size], popupAnchor: [0, -size] });
 }
@@ -72,6 +78,17 @@ function FitBounds({ atms }: { atms: any[] }) {
 export default function ATMMap({ atms, selectedId, onATMClick }: ATMMapProps) {
   const validATMs = useMemo(() => atms.filter(a => a.latitude && a.longitude), [atms]);
 
+  const [isDark, setIsDark] = useState(
+    () => document.documentElement.getAttribute('data-theme') !== 'light'
+  );
+  useEffect(() => {
+    const obs = new MutationObserver(() =>
+      setIsDark(document.documentElement.getAttribute('data-theme') !== 'light')
+    );
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
+  }, []);
+
   return (
     <MapContainer
       center={INDIA_CENTER}
@@ -84,7 +101,9 @@ export default function ATMMap({ atms, selectedId, onATMClick }: ATMMapProps) {
       zoomControl={true}
     >
       <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        url={isDark
+          ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"}
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
         subdomains="abcd"
         maxZoom={19}
@@ -96,7 +115,7 @@ export default function ATMMap({ atms, selectedId, onATMClick }: ATMMapProps) {
         <Marker
           key={atm.id}
           position={[atm.latitude, atm.longitude]}
-          icon={makeIcon(atm.status, atm.id === selectedId)}
+          icon={makeIcon(atm.status, atm.id === selectedId, atm.status === 'OFFLINE' || atm.status === 'DEGRADED')}
           eventHandlers={{ click: () => onATMClick(atm) }}
         >
           <Popup closeButton={false} className="atm-popup">

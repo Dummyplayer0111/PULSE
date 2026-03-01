@@ -80,8 +80,8 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
       onClick={onClick}
       className="px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150"
       style={active
-        ? { background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', color: 'white' }
-        : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.45)' }
+        ? { background: 'var(--p-card-strong)', border: '1px solid var(--p-card-border)', color: 'var(--p-text)' }
+        : { background: 'var(--p-card)', border: '1px solid var(--p-card-border)', color: 'var(--p-text-dim)' }
       }
     >
       {label.replace('_', ' ')}
@@ -90,9 +90,9 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
 }
 
 const inputStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  color: 'white',
+  background: 'var(--p-card-strong)',
+  border: '1px solid var(--p-card-border)',
+  color: 'var(--p-text)',
   borderRadius: '10px',
   outline: 'none',
   fontSize: '13px',
@@ -367,7 +367,7 @@ export default function Incidents() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-white">Incidents</h1>
-            <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--p-heading-dim)' }}>
               {filtered.length} of {(incidents as any[]).length} incident{(incidents as any[]).length !== 1 ? 's' : ''}
             </p>
           </div>
@@ -383,17 +383,17 @@ export default function Incidents() {
             <div
               key={label}
               className="flex flex-col items-center px-4 py-2 rounded-xl"
-              style={{ background: `${color}0a`, border: `1px solid ${color}20` }}
+              style={{ background: 'var(--p-card)', border: `1px solid ${color}40` }}
             >
               <span className="text-lg font-bold" style={{ color }}>{value}</span>
-              <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</span>
+              <span className="text-[10px]" style={{ color: 'var(--p-text-dim)' }}>{label}</span>
             </div>
           ))}
           <button
             onClick={() => exportCSV(filtered)}
             disabled={filtered.length === 0}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-40"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}
+            style={{ background: 'var(--p-card-strong)', border: '1px solid var(--p-card-border)', color: 'var(--p-text-dim)' }}
             title="Export filtered incidents as CSV"
           >
             <Download size={13} />
@@ -416,12 +416,12 @@ export default function Incidents() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>Severity:</span>
+          <span className="text-xs font-medium" style={{ color: 'var(--p-heading-muted)' }}>Severity:</span>
           {SEVERITIES.map(s => (
             <Pill key={s} label={s} active={sevFilter === s} onClick={() => setSevFilter(s)} />
           ))}
           <span className="mx-1" />
-          <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>Status:</span>
+          <span className="text-xs font-medium" style={{ color: 'var(--p-heading-muted)' }}>Status:</span>
           {STATUSES.map(s => (
             <Pill key={s} label={s} active={staFilter === s} onClick={() => setStaFilter(s)} />
           ))}
@@ -431,7 +431,7 @@ export default function Incidents() {
       {/* Table */}
       <div
         className="rounded-2xl overflow-hidden"
-        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+        style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
       >
         {isLoading ? (
           <div className="p-12 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>Loading…</div>
@@ -466,11 +466,11 @@ export default function Incidents() {
                     key={inc.id}
                     className="transition-colors cursor-pointer"
                     style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,0.025)'}
+                    onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--p-card-hover)'}
                     onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
                     onClick={() => setDetailInc(inc)}
                   >
-                    <td className="px-5 py-4 text-xs font-mono" style={{ color: 'rgba(255,255,255,0.28)' }}>
+                    <td className="px-5 py-4 text-xs font-mono" style={{ color: 'var(--p-text-muted)' }}>
                       {shortId(inc.incidentId || String(inc.id))}
                     </td>
                     <td className="px-5 py-4 text-sm font-medium text-white max-w-[180px]">

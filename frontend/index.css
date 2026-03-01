@@ -2,10 +2,74 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
-/* Dark leaflet tiles — remove default white background */
-.leaflet-container {
-  background: #0b0b0f !important;
+/* ── CSS Theme Tokens ─────────────────────────────────────────────────── */
+:root {
+  --p-page: #0b0b0f;
+  /* sidebar — opaque black glass, no blue bleed */
+  --p-sidebar: rgba(10,10,13,0.96);
+  --p-sidebar-border: rgba(255,255,255,0.08);
+  --p-sidebar-label: rgba(255,255,255,0.22);
+  --p-nav-inactive: rgba(255,255,255,0.38);
+  --p-nav-active-bg: rgba(255,255,255,0.10);
+  --p-nav-active-bg2: rgba(255,255,255,0.05);
+  --p-nav-active-bdr: rgba(255,255,255,0.14);
+  --p-card: rgba(255,255,255,0.04);
+  --p-card-strong: rgba(255,255,255,0.07);
+  --p-card-border: rgba(255,255,255,0.08);
+  --p-card-hover: rgba(255,255,255,0.025);
+  --p-text: #ffffff;
+  --p-text-dim: rgba(255,255,255,0.45);
+  --p-text-muted: rgba(255,255,255,0.22);
+  --p-user-pill: rgba(255,255,255,0.05);
+  --p-user-pill-border: rgba(255,255,255,0.08);
+  --p-logo-bg1: rgba(255,255,255,0.13);
+  --p-logo-bg2: rgba(255,255,255,0.05);
+  --p-logo-border: rgba(255,255,255,0.14);
+  --p-toggle-bg: rgba(255,255,255,0.08);
+  --p-toggle-border: rgba(255,255,255,0.13);
+  --p-sidebar-text: #ffffff;
+  --p-heading: #ffffff;
+  --p-heading-dim: rgba(255,255,255,0.5);
+  --p-heading-muted: rgba(255,255,255,0.28);
+  --p-gauge-inner: #0b0b0f;
 }
+
+:root[data-theme="light"] {
+  --p-page: #dde6f5;
+  --p-sidebar: rgba(255,255,255,0.55);
+  --p-sidebar-border: rgba(0,0,0,0.08);
+  --p-sidebar-label: rgba(0,0,0,0.35);
+  --p-nav-inactive: rgba(0,0,0,0.4);
+  --p-nav-active-bg: rgba(0,0,0,0.07);
+  --p-nav-active-bg2: rgba(0,0,0,0.03);
+  --p-nav-active-bdr: rgba(0,0,0,0.12);
+  --p-card: rgba(10,10,22,0.88);
+  --p-card-strong: rgba(10,10,22,0.94);
+  --p-card-border: rgba(255,255,255,0.10);
+  --p-card-hover: rgba(10,10,22,0.95);
+  --p-text: #ffffff;
+  --p-text-dim: rgba(255,255,255,0.45);
+  --p-text-muted: rgba(255,255,255,0.25);
+  --p-user-pill: rgba(0,0,0,0.08);
+  --p-user-pill-border: rgba(0,0,0,0.10);
+  --p-logo-bg1: rgba(0,0,0,0.15);
+  --p-logo-bg2: rgba(0,0,0,0.06);
+  --p-logo-border: rgba(0,0,0,0.15);
+  --p-toggle-bg: rgba(0,0,0,0.07);
+  --p-toggle-border: rgba(0,0,0,0.12);
+  --p-sidebar-text: rgba(0,0,0,0.85);
+  --p-heading: #1e293b;
+  --p-heading-dim: rgba(15,23,42,0.6);
+  --p-heading-muted: rgba(15,23,42,0.4);
+  --p-gauge-inner: #0a0a16;
+}
+
+/* ── Dark leaflet tiles — remove default white background ─────────────── */
+.leaflet-container {
+  background: var(--p-page) !important;
+  transition: background 0.3s ease;
+}
+
 /* Hide default leaflet attribution box styling clash */
 .leaflet-control-attribution {
   background: rgba(0,0,0,0.55) !important;
@@ -24,7 +88,8 @@
   background: rgba(40,40,52,0.95) !important;
   color: white !important;
 }
-/* Dark popup */
+
+/* ── Dark popup ───────────────────────────────────────────────────────── */
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
   background: transparent !important;
@@ -39,6 +104,41 @@
   overflow: hidden;
 }
 
+/* ── Leaflet light-mode overrides ─────────────────────────────────────── */
+[data-theme="light"] .leaflet-container { background: #dde6f5 !important; }
+[data-theme="light"] .leaflet-control-zoom a {
+  background: rgba(255,255,255,0.85) !important;
+  color: #0a0a14 !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+[data-theme="light"] .leaflet-control-zoom a:hover {
+  background: rgba(255,255,255,1) !important;
+  color: #0a0a14 !important;
+}
+[data-theme="light"] .leaflet-control-attribution {
+  background: rgba(255,255,255,0.7) !important;
+  color: rgba(0,0,0,0.5) !important;
+}
+[data-theme="light"] .leaflet-control-attribution a {
+  color: rgba(0,0,0,0.6) !important;
+}
+
+/* ── Light-mode page text override ───────────────────────────────────── */
+/* In light mode, text-white Tailwind class on PAGE-LEVEL elements becomes dark */
+[data-theme="light"] #pulse-main .text-white {
+  color: var(--p-heading) !important;
+}
+/* But inside dark-card containers, text-white stays white */
+[data-theme="light"] #pulse-main [style*="var(--p-card"] .text-white,
+[data-theme="light"] #pulse-main [style*="background: \"var(--p-card"] .text-white {
+  color: #ffffff !important;
+}
+/* Smooth transition for all text */
+[data-theme="light"] #pulse-main {
+  color: var(--p-heading);
+  transition: color 0.3s ease;
+}
+
 @theme {
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
@@ -47,5 +147,24 @@
 
 body {
   font-family: var(--font-sans);
-  background-color: #0b0b0f;
+  background-color: var(--p-page);
+  transition: background-color 0.3s ease;
+}
+
+/* ── ATM Map — pulsing incident ring ──────────────────────────────────── */
+@keyframes atm-ping {
+  0%   { transform: translate(-50%, -50%) scale(0.85); opacity: 0.85; }
+  70%  { transform: translate(-50%, -50%) scale(2.4);  opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(2.4);  opacity: 0; }
+}
+.atm-incident-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: atm-ping 1.5s ease-out infinite;
+  pointer-events: none;
 }

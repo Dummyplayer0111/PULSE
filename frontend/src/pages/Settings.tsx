@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Settings as SettingsIcon, Copy, Check, AlertCircle, CheckCircle,
   Activity, Shield, Zap, Brain, Sliders, ToggleLeft, ToggleRight, Save,
-  Play, Square, Radio,
+  Play, Square, Radio, Sun, Moon,
 } from 'lucide-react';
 import {
   useGetChannelsQuery,
@@ -54,7 +54,7 @@ function TokenRow({ label, storageKey }: { label: string; storageKey: string }) 
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <div className="flex items-center justify-between py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="flex items-center justify-between py-4" style={{ borderBottom: '1px solid var(--p-card-border)' }}>
       <div>
         <p className="text-sm font-semibold text-white">{label}</p>
         <p className="text-xs mt-0.5 font-mono" style={{ color: 'rgba(255,255,255,0.35)' }}>{display}</p>
@@ -63,7 +63,7 @@ function TokenRow({ label, storageKey }: { label: string; storageKey: string }) 
         onClick={copy}
         disabled={!token}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-30"
-        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: copied ? '#4ade80' : 'rgba(255,255,255,0.55)' }}
+        style={{ background: 'var(--p-card-strong)', border: '1px solid var(--p-card-border)', color: copied ? '#4ade80' : 'rgba(255,255,255,0.55)' }}
       >
         {copied ? <Check size={12} /> : <Copy size={12} />}
         {copied ? 'Copied' : 'Copy'}
@@ -76,8 +76,8 @@ function Panel({ title, subtitle, icon: Icon, iconColor, children }: {
   title: string; subtitle?: string; icon: any; iconColor: string; children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-      <div className="flex items-center gap-3 px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}>
+      <div className="flex items-center gap-3 px-6 py-4" style={{ borderBottom: '1px solid var(--p-card-border)' }}>
         <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: `${iconColor}15`, border: `1px solid ${iconColor}25` }}>
           <Icon size={14} style={{ color: iconColor }} />
         </div>
@@ -108,8 +108,8 @@ function SimulatorPanel() {
           <div
             className="flex items-center gap-2 px-3 py-1.5 rounded-full"
             style={{
-              background: running ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.05)',
-              border: running ? '1px solid rgba(52,211,153,0.3)' : '1px solid rgba(255,255,255,0.1)',
+              background: running ? 'rgba(52,211,153,0.12)' : 'var(--p-card)',
+              border: running ? '1px solid rgba(52,211,153,0.3)' : '1px solid var(--p-card-border)',
             }}
           >
             <span
@@ -212,7 +212,7 @@ function AlertThresholdsPanel() {
                 </span>
               </div>
             </div>
-            <div className="relative rounded-full overflow-hidden" style={{ height: 6, background: 'rgba(255,255,255,0.07)' }}>
+            <div className="relative rounded-full overflow-hidden" style={{ height: 6, background: 'var(--p-card-strong)' }}>
               <div
                 className="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
                 style={{ width: `${local[key]}%`, background: `linear-gradient(90deg, ${color}60, ${color})` }}
@@ -231,7 +231,7 @@ function AlertThresholdsPanel() {
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 mt-2"
           style={{
             background: saved ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.08)',
-            border: saved ? '1px solid rgba(74,222,128,0.3)' : '1px solid rgba(255,255,255,0.12)',
+            border: saved ? '1px solid rgba(74,222,128,0.3)' : '1px solid var(--p-card-border)',
             color: saved ? '#4ade80' : 'white',
           }}
         >
@@ -275,8 +275,8 @@ function SelfHealRulesPanel() {
               key={key}
               className="flex items-center justify-between p-3 rounded-xl transition-all"
               style={{
-                background: enabled ? `${color}08` : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${enabled ? color + '22' : 'rgba(255,255,255,0.06)'}`,
+                background: enabled ? `${color}08` : 'var(--p-card)',
+                border: `1px solid ${enabled ? color + '22' : 'var(--p-card-strong)'}`,
               }}
             >
               <div className="flex-1 min-w-0 mr-4">
@@ -364,8 +364,8 @@ function AIConfigPanel() {
               onClick={() => { setLocalConf(value); setSaved(false); }}
               className="rounded-xl p-3 text-left transition-all"
               style={{
-                background: Math.abs(localConf - value) < 0.01 ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.03)',
-                border: Math.abs(localConf - value) < 0.01 ? '1px solid rgba(168,85,247,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                background: Math.abs(localConf - value) < 0.01 ? 'rgba(168,85,247,0.15)' : 'var(--p-card)',
+                border: Math.abs(localConf - value) < 0.01 ? '1px solid rgba(168,85,247,0.4)' : '1px solid var(--p-card-border)',
               }}
             >
               <p className="text-xs font-semibold text-white">{label}</p>
@@ -380,7 +380,7 @@ function AIConfigPanel() {
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
           style={{
             background: saved ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.08)',
-            border: saved ? '1px solid rgba(74,222,128,0.3)' : '1px solid rgba(255,255,255,0.12)',
+            border: saved ? '1px solid rgba(74,222,128,0.3)' : '1px solid var(--p-card-border)',
             color: saved ? '#4ade80' : 'white',
           }}
         >
@@ -396,19 +396,59 @@ function AIConfigPanel() {
 export default function Settings() {
   const { data: channels = [], isLoading, error } = useGetChannelsQuery();
 
+  const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>(
+    () => (document.documentElement.getAttribute('data-theme') as any) ?? 'dark'
+  );
+
+  useEffect(() => {
+    const handler = (e: Event) =>
+      setCurrentTheme((e as CustomEvent).detail as 'dark' | 'light');
+    window.addEventListener('pulse-theme-change', handler);
+    return () => window.removeEventListener('pulse-theme-change', handler);
+  }, []);
+
+  const toggleTheme = () => {
+    const next = currentTheme === 'dark' ? 'light' : 'dark';
+    setCurrentTheme(next);
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('pulse-theme', next);
+    window.dispatchEvent(new CustomEvent('pulse-theme-change', { detail: next }));
+  };
+
   return (
     <div className="p-6 space-y-4" style={{ minHeight: '100vh' }}>
 
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid var(--p-card-border)' }}>
           <SettingsIcon size={16} className="text-white" />
         </div>
         <div>
           <h1 className="text-xl font-bold text-white">Settings</h1>
-          <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>System configuration and engine controls</p>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--p-heading-dim)' }}>System configuration and engine controls</p>
         </div>
       </div>
+
+      {/* Appearance */}
+      <Panel title="Appearance" subtitle="Interface theme preference" icon={currentTheme === 'dark' ? Moon : Sun} iconColor="#60a5fa">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-white">
+              {currentTheme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--p-text-dim)' }}>
+              {currentTheme === 'dark'
+                ? 'Black glass interface — recommended'
+                : 'Soft blue-white with dark glass cards'}
+            </p>
+          </div>
+          <button onClick={toggleTheme} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--p-text)', padding: 0 }}>
+            {currentTheme === 'dark'
+              ? <ToggleRight size={36} style={{ color: '#4ade80' }} />
+              : <ToggleLeft  size={36} style={{ color: 'rgba(255,255,255,0.3)' }} />}
+          </button>
+        </div>
+      </Panel>
 
       {/* Simulator */}
       <SimulatorPanel />
@@ -461,7 +501,7 @@ export default function Settings() {
         ) : (
           <table className="w-full">
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <tr style={{ borderBottom: '1px solid var(--p-card-border)' }}>
                 {['ID', 'Name', 'Type', 'Status'].map(h => (
                   <th key={h} className="pb-3 text-left text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.28)' }}>{h}</th>
                 ))}
@@ -469,7 +509,7 @@ export default function Settings() {
             </thead>
             <tbody>
               {(channels as any[]).map((ch: any) => (
-                <tr key={ch.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <tr key={ch.id} style={{ borderBottom: '1px solid var(--p-card-border)' }}>
                   <td className="py-3 text-xs font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>{ch.id}</td>
                   <td className="py-3 text-sm text-white">{ch.name || '—'}</td>
                   <td className="py-3 text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>{ch.type || '—'}</td>

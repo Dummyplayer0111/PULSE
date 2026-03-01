@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ScrollText, Search, Download, RefreshCw } from 'lucide-react';
 import { useGetLogsQuery } from '../services/pulseApi';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 const LEVELS = ['ALL', 'INFO', 'WARN', 'ERROR', 'CRITICAL'] as const;
 
@@ -63,6 +64,32 @@ export default function Logs() {
     });
   }, [logs, sourceFilter, search]);
 
+  const [liveLogs, setLiveLogs] = useState<any[]>([]);
+  const atmIntId = sourceFilter
+    ? parseInt(sourceFilter.split('-').pop()!, 16)
+    : 0;
+  const wsUrl = atmIntId ? `ws://localhost:8000/ws/logs/${atmIntId}/` : '';
+  const { status: wsStatus, lastMessage: wsMsg } = useWebSocket(wsUrl, { reconnect: !!wsUrl });
+
+  useEffect(() => {
+    if (!wsMsg) return;
+    if (wsMsg.type === 'log_entry' || wsMsg.log_level) {
+      setLiveLogs(prev => [wsMsg, ...prev].slice(0, 200));
+    }
+  }, [wsMsg]);
+
+  useEffect(() => { setLiveLogs([]); }, [sourceFilter]);
+
+  const displayLogs = useMemo(() => {
+    if (!liveLogs.length) return filtered;
+    const seen = new Set<string>();
+    return [...liveLogs, ...filtered].filter(l => {
+      const key = `${l.timestamp}:${l.eventCode ?? l.event_code}`;
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+  }, [liveLogs, filtered]);
+
   return (
     <div className="p-8 space-y-5" style={{ minHeight: '100vh' }}>
 
@@ -77,7 +104,7 @@ export default function Logs() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white">Logs</h1>
-            <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--p-heading-dim)' }}>
               {isLoading ? 'Loading…' : `${filtered.length} of ${(logs as any[]).length} entries`}
               {isFetching && !isLoading && (
                 <span className="ml-2 text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>refreshing…</span>
@@ -90,7 +117,7 @@ export default function Logs() {
           <button
             onClick={() => refetch()}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)' }}
+            style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)', color: 'rgba(255,255,255,0.6)' }}
           >
             <RefreshCw size={12} className={isFetching ? 'animate-spin' : ''} />
             Refresh
@@ -99,7 +126,7 @@ export default function Logs() {
             onClick={() => exportCSV(filtered)}
             disabled={filtered.length === 0}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-40"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}
+            style={{ background: 'var(--p-card-strong)', border: '1px solid var(--p-card-border)', color: 'rgba(255,255,255,0.7)' }}
           >
             <Download size={12} />
             Export CSV
@@ -121,7 +148,7 @@ export default function Logs() {
                 className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
                 style={active
                   ? { background: style?.bg ?? 'rgba(255,255,255,0.12)', border: `1px solid ${style?.color ?? '#fff'}40`, color: style?.color ?? 'white' }
-                  : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.4)' }
+                  : { background: 'var(--p-card)', border: '1px solid var(--p-card-border)', color: 'rgba(255,255,255,0.4)' }
                 }
               >
                 {lvl}
@@ -138,8 +165,8 @@ export default function Logs() {
           onChange={e => setSourceFilter(e.target.value)}
           className="px-3 py-1.5 rounded-xl text-xs font-medium appearance-none"
           style={{
-            background: 'rgba(255,255,255,0.05)',
-            border: sourceFilter ? '1px solid rgba(96,165,250,0.4)' : '1px solid rgba(255,255,255,0.1)',
+            background: 'var(--p-card)',
+            border: sourceFilter ? '1px solid rgba(96,165,250,0.4)' : '1px solid var(--p-card-border)',
             color: sourceFilter ? '#60a5fa' : 'rgba(255,255,255,0.5)',
             outline: 'none',
             minWidth: '130px',
@@ -148,6 +175,15 @@ export default function Logs() {
           <option value="" style={{ background: '#1a1a2e' }}>All sources</option>
           {sources.map(s => <option key={s} value={s} style={{ background: '#1a1a2e' }}>{s}</option>)}
         </select>
+
+        {wsUrl && (
+          <span style={{ fontSize: 9, color: wsStatus === 'open' ? '#4ade80' : '#6b7280',
+            background: wsStatus === 'open' ? 'rgba(74,222,128,0.1)' : 'rgba(107,114,128,0.1)',
+            border: `1px solid ${wsStatus === 'open' ? 'rgba(74,222,128,0.3)' : 'rgba(107,114,128,0.2)'}`,
+            borderRadius: 4, padding: '1px 5px' }}>
+            {wsStatus === 'open' ? '● LIVE' : '○ connecting'}
+          </span>
+        )}
 
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -159,9 +195,9 @@ export default function Logs() {
             placeholder="Search message or event code…"
             className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs"
             style={{
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: 'white',
+              background: 'var(--p-card-strong)',
+              border: '1px solid var(--p-card-border)',
+              color: 'var(--p-text)',
               outline: 'none',
             }}
           />
@@ -171,17 +207,17 @@ export default function Logs() {
       {/* Table */}
       <div
         className="rounded-2xl overflow-hidden"
-        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+        style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
       >
         {isLoading ? (
           <div className="p-12 text-center">
             <div className="space-y-3">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-10 rounded-xl animate-pulse" style={{ background: 'rgba(255,255,255,0.04)' }} />
+                <div key={i} className="h-10 rounded-xl animate-pulse" style={{ background: 'var(--p-card)' }} />
               ))}
             </div>
           </div>
-        ) : filtered.length === 0 ? (
+        ) : displayLogs.length === 0 ? (
           <div className="p-12 text-center">
             <ScrollText size={32} style={{ color: 'rgba(255,255,255,0.1)', margin: '0 auto 12px' }} />
             <p className="text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No log entries match your filters.</p>
@@ -189,7 +225,7 @@ export default function Logs() {
         ) : (
           <table className="w-full">
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <tr style={{ borderBottom: '1px solid var(--p-card-border)' }}>
                 {['Timestamp', 'Level', 'Source', 'Event Code', 'Message'].map(h => (
                   <th
                     key={h}
@@ -202,7 +238,7 @@ export default function Logs() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((log: any, i: number) => {
+              {displayLogs.map((log: any, i: number) => {
                 const lvl = log.level as string;
                 const style = LEVEL_STYLE[lvl] ?? { color: '#9ca3af', bg: 'rgba(156,163,175,0.12)' };
                 const rowBg = ROW_BG[lvl] ?? 'transparent';
@@ -210,7 +246,7 @@ export default function Logs() {
                 return (
                   <tr
                     key={log.id ?? i}
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: rowBg }}
+                    style={{ borderBottom: '1px solid var(--p-card-border)', background: rowBg }}
                   >
                     <td className="px-4 py-3 text-xs font-mono whitespace-nowrap" style={{ color: 'rgba(255,255,255,0.35)' }}>
                       {ts ? new Date(ts).toLocaleString() : '—'}

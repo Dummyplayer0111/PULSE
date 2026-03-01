@@ -31,9 +31,9 @@ function staStyle(s: string) {
 }
 
 const inputStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  color: 'white',
+  background: 'var(--p-card-strong)',
+  border: '1px solid var(--p-card-border)',
+  color: 'var(--p-text)',
   borderRadius: '10px',
   outline: 'none',
   fontSize: '13px',
@@ -45,8 +45,8 @@ function TabBtn({ label, active, onClick }: { label: string; active: boolean; on
       onClick={onClick}
       className="px-5 py-2.5 text-sm font-medium transition-all capitalize"
       style={{
-        color: active ? 'white' : 'rgba(255,255,255,0.4)',
-        borderBottom: active ? '2px solid rgba(255,255,255,0.7)' : '2px solid transparent',
+        color: active ? 'var(--p-heading)' : 'var(--p-heading-dim)',
+        borderBottom: active ? '2px solid var(--p-heading)' : '2px solid transparent',
       }}
     >
       {label}
@@ -95,14 +95,14 @@ export default function Communications() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-white">Communications</h1>
-          <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--p-heading-dim)' }}>
             Send customer notifications and manage message templates
           </p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+      <div style={{ borderBottom: '1px solid var(--p-card-border)' }}>
         <TabBtn label="notifications" active={tab === 'notifications'} onClick={() => setTab('notifications')} />
         <TabBtn label="templates"     active={tab === 'templates'}     onClick={() => setTab('templates')}     />
       </div>
@@ -114,7 +114,7 @@ export default function Communications() {
           {/* Send form */}
           <div
             className="rounded-2xl p-6"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+            style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
           >
             <h3 className="text-sm font-semibold text-white mb-4">Send Notification</h3>
             <form onSubmit={handleSend} className="space-y-4">
@@ -201,9 +201,9 @@ export default function Communications() {
           {/* Sent history */}
           <div
             className="rounded-2xl overflow-hidden"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+            style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
           >
-            <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--p-card-border)' }}>
               <h3 className="text-sm font-semibold text-white">Sent Notifications</h3>
             </div>
             {notifLoading ? (
@@ -222,7 +222,7 @@ export default function Communications() {
             ) : (
               <table className="w-full">
                 <thead>
-                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--p-card-border)' }}>
                     {['Recipient', 'Channel', 'Message', 'Status', 'Sent'].map(h => (
                       <th key={h} className="px-5 py-3.5 text-left text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.28)' }}>{h}</th>
                     ))}
@@ -232,8 +232,8 @@ export default function Communications() {
                   {(notifications as any[]).map((n: any) => {
                     const st = staStyle(n.status || 'SENT');
                     return (
-                      <tr key={n.id} className="transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,0.025)'}
+                      <tr key={n.id} className="transition-colors" style={{ borderBottom: '1px solid var(--p-card-border)' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--p-card-hover)'}
                         onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
                       >
                         <td className="px-5 py-3.5 text-xs font-mono" style={{ color: 'rgba(255,255,255,0.4)' }}>
@@ -266,9 +266,9 @@ export default function Communications() {
             <button
               onClick={() => setShowTmpl(true)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
-              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'white' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.13)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+              style={{ background: 'var(--p-card-strong)', border: '1px solid var(--p-card-border)', color: 'var(--p-text)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--p-card-hover)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--p-card-strong)')}
             >
               <Plus size={14} />
               New Template
@@ -277,7 +277,7 @@ export default function Communications() {
 
           <div
             className="rounded-2xl overflow-hidden"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+            style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
           >
             {tmplLoading ? (
               <div className="p-10 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>Loading…</div>
@@ -295,7 +295,7 @@ export default function Communications() {
             ) : (
               <table className="w-full">
                 <thead>
-                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--p-card-border)' }}>
                     {['Name', 'Language', 'Body', 'Created'].map(h => (
                       <th key={h} className="px-5 py-3.5 text-left text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.28)' }}>{h}</th>
                     ))}
@@ -303,8 +303,8 @@ export default function Communications() {
                 </thead>
                 <tbody>
                   {(templates as any[]).map((t: any) => (
-                    <tr key={t.id} className="transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                      onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,0.025)'}
+                    <tr key={t.id} className="transition-colors" style={{ borderBottom: '1px solid var(--p-card-border)' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--p-card-hover)'}
                       onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
                     >
                       <td className="px-5 py-3.5 text-sm font-semibold text-white">{t.name || '—'}</td>
@@ -370,7 +370,7 @@ export default function Communications() {
                 <button
                   onClick={() => setShowTmpl(false)}
                   className="px-4 py-2 rounded-xl text-sm font-medium"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}
+                  style={{ background: 'var(--p-card-strong)', border: '1px solid var(--p-card-border)', color: 'rgba(255,255,255,0.7)' }}
                 >
                   Cancel
                 </button>

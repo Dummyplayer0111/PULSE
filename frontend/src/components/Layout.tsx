@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Map, AlertTriangle, Brain,
   ShieldAlert, MessageSquare, Settings, LogOut, Activity, ScrollText,
+  Sun, Moon,
 } from 'lucide-react';
 
 const NAV = [
@@ -16,15 +17,35 @@ const NAV = [
   { to: '/settings',       label: 'Settings',       Icon: Settings        },
 ];
 
+function getInitialTheme(): 'dark' | 'light' {
+  const stored = localStorage.getItem('pulse-theme') as 'dark' | 'light' | null;
+  if (stored === 'dark' || stored === 'light') return stored;
+  if (window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+  return 'dark';
+}
+
 export default function Layout() {
   const navigate = useNavigate();
   const token = localStorage.getItem('access_token');
+
+  const [theme, setTheme] = useState<'dark' | 'light'>(getInitialTheme);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('pulse-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     if (!token) navigate('/login', { replace: true });
   }, [token, navigate]);
 
   if (!token) return null;
+
+  const toggle = () => setTheme(t => {
+    const next = t === 'dark' ? 'light' : 'dark';
+    window.dispatchEvent(new CustomEvent('pulse-theme-change', { detail: next }));
+    return next;
+  });
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -33,45 +54,84 @@ export default function Layout() {
   };
 
   return (
-    <div className="flex min-h-screen" style={{ background: '#0b0b0f' }}>
+    <div className="flex min-h-screen" style={{ background: 'var(--p-page)', transition: 'background 0.3s ease' }}>
       {/* Sidebar */}
       <aside
         className="fixed inset-y-0 left-0 w-60 flex flex-col z-40"
         style={{
-          background: 'rgba(255,255,255,0.025)',
-          borderRight: '1px solid rgba(255,255,255,0.07)',
-          backdropFilter: 'blur(40px) saturate(180%)',
+          background: 'var(--p-sidebar)',
+          borderRight: '1px solid var(--p-sidebar-border)',
+          backdropFilter: 'blur(48px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(48px) saturate(160%)',
+          boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.04), 6px 0 32px rgba(0,0,0,0.55)',
+          transition: 'background 0.3s ease, border-color 0.3s ease',
         }}
       >
+        {/* ── Liquid glass specular highlights ── */}
+        {/* Top edge: catches the "light" above the panel */}
+        <div aria-hidden style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+          background: 'linear-gradient(90deg, transparent 5%, rgba(255,255,255,0.13) 50%, transparent 95%)',
+          pointerEvents: 'none', zIndex: 10,
+        }} />
+        {/* Right edge: soft vertical glow where sidebar meets content */}
+        <div aria-hidden style={{
+          position: 'absolute', top: 0, right: 0, bottom: 0, width: 1,
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 40%, transparent 100%)',
+          pointerEvents: 'none', zIndex: 10,
+        }} />
+
         {/* Logo */}
         <div
           className="px-6 py-4 flex items-center gap-3"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+          style={{ borderBottom: '1px solid var(--p-sidebar-border)' }}
         >
           <div
             className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
             style={{
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.06))',
-              border: '1px solid rgba(255,255,255,0.15)',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1)',
+              background: 'linear-gradient(135deg, var(--p-logo-bg1), var(--p-logo-bg2))',
+              border: '1px solid var(--p-logo-border)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.14), 0 0 10px rgba(255,255,255,0.04)',
             }}
           >
-            <Activity size={15} className="text-white" />
+            <Activity size={15} style={{ color: 'var(--p-sidebar-text)' }} />
           </div>
           <div>
-            <p className="text-sm font-bold tracking-tight text-white leading-none">PULSE</p>
+            <p className="text-sm font-bold tracking-tight leading-none" style={{ color: 'var(--p-sidebar-text)' }}>PULSE</p>
             <div className="flex items-center gap-1.5 mt-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ animation: 'pulse 2s infinite' }} />
-              <span className="text-[9px] uppercase tracking-widest font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              <span className="text-[9px] uppercase tracking-widest font-medium" style={{ color: 'var(--p-sidebar-label)' }}>
                 Live
               </span>
             </div>
           </div>
+          {/* Theme toggle */}
+          <button
+            onClick={toggle}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            style={{
+              marginLeft: 'auto',
+              background: 'var(--p-toggle-bg)',
+              border: '1px solid var(--p-toggle-border)',
+              borderRadius: '8px',
+              width: 28,
+              height: 28,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: 'var(--p-text)',
+              transition: 'all 0.2s',
+              flexShrink: 0,
+            }}
+          >
+            {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
+          </button>
         </div>
 
         {/* Section label */}
         <div className="px-6 pt-5 pb-1">
-          <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>
+          <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: 'var(--p-sidebar-label)' }}>
             Navigation
           </p>
         </div>
@@ -82,22 +142,33 @@ export default function Layout() {
             <NavLink
               key={to}
               to={to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
-                  isActive
-                    ? 'text-white'
-                    : 'text-white/40 hover:text-white/80'
-                }`
-              }
+              className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150"
               style={({ isActive }) => ({
+                color: isActive ? 'var(--p-sidebar-text)' : 'var(--p-nav-inactive)',
                 background: isActive
-                  ? 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))'
+                  ? `linear-gradient(135deg, var(--p-nav-active-bg), var(--p-nav-active-bg2))`
                   : 'transparent',
                 border: isActive
-                  ? '1px solid rgba(255,255,255,0.1)'
+                  ? '1px solid var(--p-nav-active-bdr)'
                   : '1px solid transparent',
-                boxShadow: isActive ? 'inset 0 1px 0 rgba(255,255,255,0.06)' : 'none',
+                boxShadow: isActive
+                  ? 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 0 0 1px rgba(255,255,255,0.04)'
+                  : 'none',
               })}
+              onMouseEnter={e => {
+                const el = e.currentTarget as HTMLAnchorElement;
+                if (el.getAttribute('aria-current') !== 'page') {
+                  el.style.color = 'var(--p-sidebar-text)';
+                  el.style.background = 'rgba(255,255,255,0.05)';
+                }
+              }}
+              onMouseLeave={e => {
+                const el = e.currentTarget as HTMLAnchorElement;
+                if (el.getAttribute('aria-current') !== 'page') {
+                  el.style.color = 'var(--p-nav-inactive)';
+                  el.style.background = 'transparent';
+                }
+              }}
             >
               <Icon size={15} />
               {label}
@@ -106,24 +177,25 @@ export default function Layout() {
         </nav>
 
         {/* Footer */}
-        <div className="px-3 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="px-3 py-4" style={{ borderTop: '1px solid var(--p-sidebar-border)' }}>
           {/* User pill */}
           <div
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+            style={{ background: 'var(--p-user-pill)', border: '1px solid var(--p-user-pill-border)' }}
           >
             <div
-              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold text-white"
+              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold"
               style={{
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.08))',
-                border: '1px solid rgba(255,255,255,0.15)',
+                color: 'var(--p-sidebar-text)',
+                background: 'linear-gradient(135deg, var(--p-logo-bg1), var(--p-logo-bg2))',
+                border: '1px solid var(--p-logo-border)',
               }}
             >
               A
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-white truncate leading-none">Admin</p>
-              <p className="text-[10px] mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.35)' }}>
+              <p className="text-xs font-semibold truncate leading-none" style={{ color: 'var(--p-sidebar-text)' }}>Admin</p>
+              <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--p-sidebar-label)' }}>
                 Operations
               </p>
             </div>
@@ -138,8 +210,16 @@ export default function Layout() {
           {/* Logout */}
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 text-white/40 hover:text-white/80 hover:bg-white/5"
-            style={{ border: '1px solid transparent' }}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150"
+            style={{ border: '1px solid transparent', color: 'var(--p-nav-inactive)', background: 'transparent' }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = 'var(--p-sidebar-text)';
+              e.currentTarget.style.background = 'var(--p-nav-active-bg)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = 'var(--p-nav-inactive)';
+              e.currentTarget.style.background = 'transparent';
+            }}
           >
             <LogOut size={15} />
             Sign Out
@@ -148,7 +228,7 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <main className="ml-60 flex-1 min-h-screen" style={{ background: '#0b0b0f' }}>
+      <main id="pulse-main" className="ml-60 flex-1 min-h-screen" style={{ background: 'var(--p-page)', transition: 'background 0.3s ease' }}>
         <Outlet />
       </main>
     </div>

@@ -36,8 +36,8 @@ function KPICard({ label, value, Icon, color, sub }: {
 }) {
   return (
     <div className="rounded-2xl p-4 relative overflow-hidden" style={{
-      background: 'rgba(255,255,255,0.04)',
-      border: '1px solid rgba(255,255,255,0.08)',
+      background: 'var(--p-card)',
+      border: '1px solid var(--p-card-border)',
     }}>
       <div className="absolute inset-x-0 top-0" style={{ height: '1px', background: `linear-gradient(90deg,transparent,${color}55,transparent)` }} />
       <div className="flex items-center justify-between mb-3">
@@ -47,7 +47,7 @@ function KPICard({ label, value, Icon, color, sub }: {
         {sub && <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ color, background: `${color}15` }}>{sub}</span>}
       </div>
       <p className="text-2xl font-bold text-white leading-none">{value}</p>
-      <p className="text-xs mt-1 font-medium" style={{ color: 'rgba(255,255,255,0.38)' }}>{label}</p>
+      <p className="text-xs mt-1 font-medium" style={{ color: 'var(--p-text-dim)' }}>{label}</p>
     </div>
   );
 }
@@ -61,7 +61,7 @@ function HealthGauge({ score }: { score: number }) {
     <div className="flex flex-col items-center gap-3">
       <div className="relative" style={{ width: 100, height: 100 }}>
         <div className="absolute inset-0 rounded-full" style={{ background: `conic-gradient(${color} ${deg}deg, rgba(255,255,255,0.06) ${deg}deg)` }} />
-        <div className="absolute rounded-full flex flex-col items-center justify-center" style={{ inset: 7, background: '#0b0b0f' }}>
+        <div className="absolute rounded-full flex flex-col items-center justify-center" style={{ inset: 7, background: 'var(--p-gauge-inner)' }}>
           <span className="text-xl font-bold" style={{ color }}>{clamped}</span>
           <span className="text-[9px]" style={{ color: 'rgba(255,255,255,0.3)' }}>/ 100</span>
         </div>
@@ -79,8 +79,8 @@ function HealthGauge({ score }: { score: number }) {
 /* ── Panel ────────────────────────────────────────────────────────────── */
 function Panel({ title, children, headerRight }: { title: string; children: React.ReactNode; headerRight?: React.ReactNode }) {
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-      <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}>
+      <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--p-card-border)' }}>
         <h3 className="text-sm font-semibold text-white">{title}</h3>
         {headerRight}
       </div>
@@ -114,7 +114,78 @@ function LiveEventRow({ ev }: { ev: any }) {
 
 /* ── Skeleton ─────────────────────────────────────────────────────────── */
 function Skeleton({ h = 'h-4' }: { h?: string }) {
-  return <div className={`${h} rounded-lg animate-pulse`} style={{ background: 'rgba(255,255,255,0.06)' }} />;
+  return <div className={`${h} rounded-lg animate-pulse`} style={{ background: 'var(--p-card-strong)' }} />;
+}
+
+/* ── Root Cause Donut ────────────────────────────────────────────────── */
+const RC_COLORS: Record<string, string> = {
+  NETWORK:  '#60a5fa',
+  HARDWARE: '#f97316',
+  CASH_JAM: '#f59e0b',
+  FRAUD:    '#ef4444',
+  SERVER:   '#a78bfa',
+  TIMEOUT:  '#fb923c',
+  SWITCH:   '#34d399',
+  UNKNOWN:  '#6b7280',
+};
+
+function DashboardDonut({ stats }: { stats: any[] }) {
+  const SIZE = 140, CX = 70, CY = 70, R = 52, INNER = 32;
+  const total = stats.reduce((a: number, s: any) => a + (s.count ?? 0), 0);
+
+  if (!stats.length || total === 0) {
+    return (
+      <div className="p-8 text-center">
+        <AlertCircle size={26} style={{ color: 'rgba(255,255,255,0.1)', margin: '0 auto 8px' }} />
+        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>Stats build from incidents. Ingest logs to populate.</p>
+      </div>
+    );
+  }
+
+  let angle = -Math.PI / 2;
+  const arcs = stats.map((s: any, i: number) => {
+    const color = RC_COLORS[s.category] ?? `hsl(${i * 45},65%,58%)`;
+    const sweep = ((s.count ?? 0) / total) * 2 * Math.PI;
+    const x1 = CX + R * Math.cos(angle);
+    const y1 = CY + R * Math.sin(angle);
+    angle += sweep;
+    const x2 = CX + R * Math.cos(angle);
+    const y2 = CY + R * Math.sin(angle);
+    const large = sweep > Math.PI ? 1 : 0;
+    const path = `M ${CX} ${CY} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${R} ${R} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
+    return { path, color, pct: Math.round(((s.count ?? 0) / total) * 100), category: s.category, count: s.count };
+  });
+
+  return (
+    <div className="flex items-center gap-4 px-4 py-3">
+      {/* Donut SVG */}
+      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ flexShrink: 0 }}>
+        {arcs.map((a, i) => (
+          <path key={i} d={a.path} fill={a.color} stroke="rgba(0,0,0,0.25)" strokeWidth="1.5" />
+        ))}
+        <circle cx={CX} cy={CY} r={INNER} fill="var(--p-gauge-inner)" />
+        <text x={CX} y={CY - 4} textAnchor="middle" fill="white" fontSize="17" fontWeight="700" fontFamily="inherit">{total}</text>
+        <text x={CX} y={CY + 11} textAnchor="middle" fill="rgba(255,255,255,0.38)" fontSize="8.5" fontFamily="inherit">incidents</text>
+      </svg>
+      {/* Legend */}
+      <div className="flex-1 space-y-1.5">
+        {stats.slice(0, 7).map((s: any, i: number) => {
+          const color = RC_COLORS[s.category] ?? `hsl(${i * 45},65%,58%)`;
+          const pct   = total > 0 ? Math.round(((s.count ?? 0) / total) * 100) : 0;
+          return (
+            <div key={i} className="flex items-center gap-2">
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0, display: 'inline-block' }} />
+              <span className="text-[10px] text-white flex-1 truncate font-medium">{s.category || 'UNKNOWN'}</span>
+              <div style={{ width: 36, height: 3, borderRadius: 2, background: 'var(--p-card-strong)', overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.6s ease' }} />
+              </div>
+              <span className="text-[10px] w-7 text-right" style={{ color: 'rgba(255,255,255,0.4)' }}>{pct}%</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 /* ── main page ───────────────────────────────────────────────────────── */
@@ -142,7 +213,7 @@ export default function Dashboard() {
   const recentEvents   = pipelineEvents.slice(0, 12);
 
   return (
-    <div className="p-5 space-y-4" style={{ color: '#fff', minHeight: '100vh' }}>
+    <div className="p-5 space-y-4" style={{ minHeight: '100vh' }}>
 
       {/* Anomaly Banner */}
       {activeAno > 0 && (
@@ -160,20 +231,20 @@ export default function Dashboard() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-white">Operations Center</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>PULSE real-time ATM & payment monitoring</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--p-heading-dim)' }}>PULSE real-time ATM & payment monitoring</p>
         </div>
         <div className="flex items-center gap-2">
           {/* WS status */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}>
             {wsStatus === 'connected'
               ? <><Wifi size={11} style={{ color: '#4ade80' }} /><span className="text-[10px] font-medium" style={{ color: '#4ade80' }}>Live</span></>
               : <><WifiOff size={11} style={{ color: '#6b7280' }} /><span className="text-[10px]" style={{ color: '#6b7280' }}>Connecting…</span></>}
           </div>
           {/* Fleet quick stats */}
-          <div className="flex items-center gap-3 px-4 py-1.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="flex items-center gap-3 px-4 py-1.5 rounded-xl" style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}>
             <Server size={11} style={{ color: 'rgba(255,255,255,0.4)' }} />
             <span className="text-xs font-semibold text-white">{atmCounts.total} ATMs</span>
-            <div className="w-px h-3" style={{ background: 'rgba(255,255,255,0.1)' }} />
+            <div className="w-px h-3" style={{ background: 'var(--p-card-border)' }} />
             {[
               { count: atmCounts.online,   color: '#4ade80', label: 'up' },
               { count: atmCounts.degraded, color: '#f59e0b', label: 'deg' },
@@ -185,7 +256,7 @@ export default function Dashboard() {
                 <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</span>
               </div>
             ))}
-            <div className="w-px h-3" style={{ background: 'rgba(255,255,255,0.1)' }} />
+            <div className="w-px h-3" style={{ background: 'var(--p-card-border)' }} />
             <span className="text-xs font-bold" style={{ color: upiRate >= 95 ? '#4ade80' : '#f59e0b' }}>{upiRate}%</span>
             <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>UPI</span>
           </div>
@@ -201,7 +272,7 @@ export default function Dashboard() {
               <div key={ch.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{ background: ok ? 'rgba(74,222,128,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${ok ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.2)'}` }}>
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: ok ? '#4ade80' : '#ef4444' }} />
                 <span className="text-xs font-semibold" style={{ color: ok ? '#4ade80' : '#ef4444' }}>{ch.name}</span>
-                <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{ch.type}</span>
+                <span className="text-[10px]" style={{ color: 'var(--p-heading-muted)' }}>{ch.type}</span>
               </div>
             );
           })}
@@ -244,7 +315,7 @@ export default function Dashboard() {
           headerRight={
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: wsStatus === 'connected' ? '#4ade80' : '#6b7280', animation: wsStatus === 'connected' ? 'pulse 2s infinite' : 'none' }} />
-              <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>{recentEvents.length} events</span>
+              <span className="text-[10px]" style={{ color: 'var(--p-text-dim)' }}>{recentEvents.length} events</span>
             </div>
           }
         >
@@ -294,7 +365,7 @@ export default function Dashboard() {
 
       {/* Recent Incidents table */}
       <Panel title="Recent Incidents" headerRight={
-        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}>
+        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'var(--p-card-strong)', color: 'var(--p-text-dim)' }}>
           Last {Math.min((incidents as any[]).length, 8)}
         </span>
       }>
@@ -318,11 +389,11 @@ export default function Dashboard() {
               <tbody>
                 {(incidents as any[]).slice(0, 8).map((inc: any) => (
                   <tr key={inc.id} className="transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,0.025)'}
+                    onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--p-card-hover)'}
                     onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}>
-                    <td className="px-4 py-3 text-xs font-mono" style={{ color: 'rgba(255,255,255,0.28)' }}>{String(inc.incidentId || inc.id).slice(0, 12)}</td>
+                    <td className="px-4 py-3 text-xs font-mono" style={{ color: 'var(--p-text-muted)' }}>{String(inc.incidentId || inc.id).slice(0, 12)}</td>
                     <td className="px-4 py-3 text-sm text-white" style={{ maxWidth: 160 }}><span className="truncate block">{inc.title || '—'}</span></td>
-                    <td className="px-4 py-3 text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>{inc.rootCauseCategory || '—'}</td>
+                    <td className="px-4 py-3 text-xs font-semibold" style={{ color: 'var(--p-text-dim)' }}>{inc.rootCauseCategory || '—'}</td>
                     <td className="px-4 py-3">
                       {inc.aiConfidence != null && (
                         <div className="flex items-center gap-2">
@@ -339,7 +410,7 @@ export default function Dashboard() {
                     <td className="px-4 py-3">
                       <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold" style={{ color: sta(inc.status), background: `${sta(inc.status)}1a` }}>{inc.status}</span>
                     </td>
-                    <td className="px-4 py-3 text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>{formatDate(inc.createdAt)}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: 'var(--p-text-dim)' }}>{formatDate(inc.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -379,32 +450,7 @@ export default function Dashboard() {
 
         {/* Root Cause Distribution */}
         <Panel title="Root Cause Distribution">
-          {statsList.length === 0 ? (
-            <div className="p-8 text-center">
-              <AlertCircle size={26} style={{ color: 'rgba(255,255,255,0.1)', margin: '0 auto 8px' }} />
-              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>Stats build from incidents. Ingest logs to populate.</p>
-            </div>
-          ) : (
-            <div className="px-5 py-4 space-y-3">
-              {statsList.map((s: any, i: number) => {
-                const total = statsList.reduce((acc: number, x: any) => acc + (x.count ?? 0), 0);
-                const pct   = total > 0 ? ((s.count ?? 0) / total) * 100 : 0;
-                const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#a78bfa', '#60a5fa', '#4ade80', '#fb923c'];
-                const color  = COLORS[i % COLORS.length];
-                return (
-                  <div key={i} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-white">{s.category || s.label || 'Unknown'}</span>
-                      <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.38)' }}>{s.count} · {pct.toFixed(0)}%</span>
-                    </div>
-                    <div className="w-full rounded-full overflow-hidden" style={{ height: '4px', background: 'rgba(255,255,255,0.07)' }}>
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${color}70, ${color})`, transition: 'width 0.6s ease' }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <DashboardDonut stats={statsList} />
         </Panel>
       </div>
 

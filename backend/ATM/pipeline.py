@@ -233,6 +233,38 @@ def _broadcast_atm(atm):
         pass
 
 
+def _broadcast_log_entry(log_entry):
+    """
+    Broadcast every processed log to its ATM-specific group so the
+    frontend LIVE log stream (ws/logs/<atm_id>/) receives real-time rows.
+    The group name mirrors LogConsumer: logs_{atm_int_id}.
+    """
+    try:
+        atm_int_id = log_entry.sourceId.int
+        async_to_sync(get_channel_layer().group_send)(
+            f'logs_{atm_int_id}',
+            {
+                'type': 'log_entry',
+                'data': {
+                    'type':       'log_entry',
+                    'id':         log_entry.id,
+                    # camelCase + snake_case both included — frontend dedup key
+                    # uses `l.eventCode ?? l.event_code`
+                    'logLevel':   log_entry.logLevel,
+                    'log_level':  log_entry.logLevel,
+                    'eventCode':  log_entry.eventCode,
+                    'event_code': log_entry.eventCode,
+                    'message':    log_entry.message,
+                    'timestamp':  log_entry.timestamp.isoformat(),
+                    'sourceId':   str(log_entry.sourceId),
+                    'sourceType': log_entry.sourceType,
+                },
+            }
+        )
+    except Exception:
+        pass
+
+
 def _broadcast_pipeline_event(log_entry, classification, incident, heal_action):
     try:
         async_to_sync(get_channel_layer().group_send)(
@@ -439,6 +471,9 @@ def process_log(log_entry_id):
         _broadcast_atm(atm)
 
     # ── STEP 8: WebSocket Broadcast ───────────────────────────────────────────
+    # 8a. Broadcast to ATM-specific log stream (ws/logs/<atm_id>/) — all levels
+    _broadcast_log_entry(log_entry)
+    # 8b. Broadcast to dashboard group (pipeline_event + atm_update already sent above)
     _broadcast_pipeline_event(log_entry, classification, incident, heal_action)
 
     # Mark log as processed

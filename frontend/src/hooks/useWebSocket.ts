@@ -25,7 +25,7 @@ export function useWebSocket(url: string, options: UseWebSocketOptions = {}) {
   const activeRef = useRef(true);
 
   const connect = useCallback(() => {
-    if (!activeRef.current) return;
+    if (!activeRef.current || !url) return;
     setStatus('connecting');
     const ws = new WebSocket(url);
     wsRef.current = ws;
@@ -52,13 +52,14 @@ export function useWebSocket(url: string, options: UseWebSocketOptions = {}) {
 
   useEffect(() => {
     activeRef.current = true;
+    if (!url) { setStatus('closed'); return; }
     connect();
     return () => {
       activeRef.current = false;
       if (timerRef.current) clearTimeout(timerRef.current);
       wsRef.current?.close();
     };
-  }, [connect]);
+  }, [connect, url]);
 
   const send = useCallback((data: object | string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

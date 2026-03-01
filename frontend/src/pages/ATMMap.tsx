@@ -67,15 +67,15 @@ export default function ATMMapPage() {
   const chipsRight = isSidePanelOpen && selectedATM ? panelW + 20 : 12;
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#0b0b0f' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--p-page)' }}>
 
       {/* ── Compact top bar ── */}
       <div style={{
         flexShrink: 0,
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '10px 20px',
-        background: 'rgba(255,255,255,0.02)',
-        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        background: 'var(--p-card)',
+        borderBottom: '1px solid var(--p-card-border)',
       }}>
         {/* Icon + title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -87,8 +87,8 @@ export default function ATMMapPage() {
             <Map size={14} style={{ color: '#60a5fa' }} />
           </div>
           <div>
-            <p style={{ fontSize: 14, fontWeight: 700, color: 'white', lineHeight: 1, margin: 0 }}>ATM Network</p>
-            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 3, marginBottom: 0 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--p-text)', lineHeight: 1, margin: 0 }}>ATM Network</p>
+            <p style={{ fontSize: 10, color: 'var(--p-text-dim)', marginTop: 3, marginBottom: 0 }}>
               {isLoading
                 ? 'Loading…'
                 : isFiltered
@@ -98,7 +98,7 @@ export default function ATMMapPage() {
           </div>
         </div>
 
-        <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.08)' }} />
+        <div style={{ width: 1, height: 24, background: 'var(--p-card-border)' }} />
 
         {/* Status counts */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, flexWrap: 'wrap' }}>
@@ -111,7 +111,7 @@ export default function ATMMapPage() {
             <div key={label} style={{
               display: 'flex', alignItems: 'center', gap: 5,
               padding: '4px 10px', borderRadius: 8,
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+              background: 'var(--p-card)', border: '1px solid var(--p-card-border)',
             }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, display: 'block' }} />
               <span style={{ fontSize: 11, fontWeight: 700, color: 'white' }}>{count}</span>
@@ -124,7 +124,7 @@ export default function ATMMapPage() {
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
           padding: '4px 10px', borderRadius: 8,
-          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+          background: 'var(--p-card)', border: '1px solid var(--p-card-border)',
         }}>
           {wsStatus === 'connected'  ? <><Wifi     size={11} style={{ color: '#4ade80' }} /><span style={{ fontSize: 10, fontWeight: 500, color: '#4ade80' }}>Live</span></> :
            wsStatus === 'connecting' ? <><Loader   size={11} className="animate-spin" style={{ color: '#f59e0b' }} /><span style={{ fontSize: 10, fontWeight: 500, color: '#f59e0b' }}>Connecting</span></> :
@@ -154,8 +154,8 @@ export default function ATMMapPage() {
           flexShrink: 0,
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12,
           padding: '8px 20px',
-          background: 'rgba(255,255,255,0.02)',
-          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          background: 'var(--p-card)',
+          borderBottom: '1px solid var(--p-card-border)',
         }}>
           {/* Status pills */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -178,11 +178,11 @@ export default function ATMMapPage() {
             </div>
           </div>
 
-          <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)' }} />
+          <div style={{ width: 1, height: 20, background: 'var(--p-card-border)' }} />
 
           {/* City */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.3)' }}>City</span>
+            <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--p-text-muted)' }}>City</span>
             <select value={cityFilter} onChange={e => setCityFilter(e.target.value)} style={{
               padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
               background: 'rgba(255,255,255,0.06)',
@@ -195,7 +195,7 @@ export default function ATMMapPage() {
             </select>
           </div>
 
-          <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)' }} />
+          <div style={{ width: 1, height: 20, background: 'var(--p-card-border)' }} />
 
           {/* Health range */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -240,7 +240,7 @@ export default function ATMMapPage() {
         ) : error ? (
           <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
             <AlertCircle size={32} style={{ color: '#f59e0b' }} />
-            <p style={{ fontSize: 13, color: 'white', margin: 0 }}>ATM backend unavailable</p>
+            <p style={{ fontSize: 13, color: 'var(--p-heading)', margin: 0 }}>ATM backend unavailable</p>
           </div>
         ) : (
           <ATMMapComponent
@@ -257,9 +257,9 @@ export default function ATMMapPage() {
             bottom: 12, left: 12, right: chipsRight,
             zIndex: 1000,
             borderRadius: 14,
-            background: 'rgba(11,11,15,0.88)',
+            background: 'var(--p-card)',
             backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255,255,255,0.1)',
+            border: '1px solid var(--p-card-border)',
             padding: '8px 10px',
             overflowX: 'auto',
             transition: 'right 0.25s ease',

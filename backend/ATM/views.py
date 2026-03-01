@@ -503,13 +503,49 @@ _EVENT_CODES = [
     "UPS_FAILURE", "CARD_READ_SUCCESS", "CASH_DISPENSE_OK",
 ]
 
+# Keyword heuristics — ordered most-specific first so fraud/cash win over generic network
+_KEYWORD_MAP = [
+    (["FRAUD", "MALWARE", "TAMPER", "SKIMM", "SUSPICIOUS", "UNAUTHORIZ",
+      "CLONE", "PHISH", "ATTACK", "INTRUSION"],                         "MALWARE_SIGNATURE"),
+    (["CASH", "JAM", "DISPENSE", "HOPPER", "CASSETTE", "STUCK",
+      "BILL", "NOTE", "CURRENCY", "EMPTY"],                             "CASH_DISPENSE_FAIL"),
+    (["CARD", "CHIP", "MAGNET", "READER", "EMV", "STRIPE", "SWIPE",
+      "INSERT", "NFC"],                                                  "CARD_READ_ERROR"),
+    (["UPS", "POWER", "VOLTAGE", "ELECTRIC", "BATTER"],                 "UPS_FAILURE"),
+    (["LATENCY", "BANDWIDTH", "THROUGHPUT", "SLOW", "PACKET", "PING",
+      "JITTER"],                                                         "NETWORK_LATENCY_HIGH"),
+    (["HARDWARE", "SENSOR", "MOTOR", "ROLLER", "KEYPAD", "SCREEN",
+      "DISPLAY", "THERMAL", "PRINTER", "SHUTTER", "DOOR"],              "HARDWARE_JAM"),
+    (["NETWORK", "CONNECT", "TIMEOUT", "GATEWAY", "DNS", "SOCKET",
+      "SWITCH", "LINK", "OFFLINE", "FIREWALL", "VPN",
+      "SERVER", "SERVICE", "PROCESS", "CRASH", "RESTART",
+      "MEMORY", "CPU", "DATABASE", "APPLICATION"],                      "NETWORK_TIMEOUT"),
+]
+
 def _parse_raw_log(message):
     text = message.upper()
-    event_code = next((c for c in _EVENT_CODES if c in text), "UNKNOWN")
+
+    # 1. Exact known event-code token in text — highest priority
+    for code in _EVENT_CODES:
+        if code in text:
+            for level in ("CRITICAL", "ERROR", "WARN", "WARNING", "INFO"):
+                if level in text:
+                    return code, "WARN" if level == "WARNING" else level
+            return code, "ERROR"
+
+    # 2. Keyword heuristics for free-form log text
+    for keywords, event_code in _KEYWORD_MAP:
+        if any(kw in text for kw in keywords):
+            for level in ("CRITICAL", "ERROR", "WARN", "WARNING", "INFO"):
+                if level in text:
+                    return event_code, "WARN" if level == "WARNING" else level
+            return event_code, "ERROR"
+
+    # 3. Level-only fallback — use NETWORK_TIMEOUT as generic catch-all
     for level in ("CRITICAL", "ERROR", "WARN", "WARNING", "INFO"):
         if level in text:
-            return event_code, "WARN" if level == "WARNING" else level
-    return event_code, "ERROR"
+            return "NETWORK_TIMEOUT", "WARN" if level == "WARNING" else level
+    return "NETWORK_TIMEOUT", "ERROR"
 
 
 @api_view(['POST'])

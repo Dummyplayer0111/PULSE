@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, AlertCircle, Activity, Zap, Brain, Shield, BarChart2 } from 'lucide-react';
 import {
@@ -9,6 +9,7 @@ import {
   useGetATMTransactionVolumeQuery,
 } from '../services/pulseApi';
 import { formatDate, formatDateTime } from '../utils';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 const TABS = ['Overview', 'Logs', 'Incidents', 'Health History', 'Self-Heal'] as const;
 type Tab = typeof TABS[number];
@@ -161,7 +162,7 @@ function TransactionVolumeChart({ atmId }: { atmId: string | number }) {
   return (
     <div
       className="rounded-2xl p-4 space-y-2"
-      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+      style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -175,8 +176,8 @@ function TransactionVolumeChart({ atmId }: { atmId: string | number }) {
               onClick={() => setHours(h)}
               className="text-[10px] px-2 py-0.5 rounded-lg font-medium transition-all"
               style={{
-                background: hours === h ? 'rgba(96,165,250,0.18)' : 'rgba(255,255,255,0.04)',
-                border: hours === h ? '1px solid rgba(96,165,250,0.4)' : '1px solid rgba(255,255,255,0.07)',
+                background: hours === h ? 'rgba(96,165,250,0.18)' : 'var(--p-card)',
+                border: hours === h ? '1px solid rgba(96,165,250,0.4)' : '1px solid var(--p-card-border)',
                 color: hours === h ? '#60a5fa' : 'rgba(255,255,255,0.4)',
               }}
             >{h}h</button>
@@ -204,7 +205,7 @@ function TransactionVolumeChart({ atmId }: { atmId: string | number }) {
           <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>Loading…</span>
         </div>
       ) : volume.length === 0 || totAll === 0 ? (
-        <div className="flex items-center justify-center rounded-xl" style={{ height: H, background: 'rgba(255,255,255,0.02)' }}>
+        <div className="flex items-center justify-center rounded-xl" style={{ height: H, background: 'var(--p-card)' }}>
           <span className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>No transactions in this window</span>
         </div>
       ) : (
@@ -327,14 +328,14 @@ function ActiveIncidentCard({ incidents }: { incidents: any[] }) {
             <div className="grid grid-cols-2 gap-3">
               <div
                 className="rounded-xl p-3"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+                style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
               >
                 <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Root Cause</p>
                 <p className="text-sm font-bold mt-0.5" style={{ color: sv.color }}>{inc.rootCauseCategory || '—'}</p>
               </div>
               <div
                 className="rounded-xl p-3"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+                style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
               >
                 <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>AI Confidence</p>
                 <p className="text-sm font-bold mt-0.5" style={{ color: '#a78bfa' }}>
@@ -346,7 +347,7 @@ function ActiveIncidentCard({ incidents }: { incidents: any[] }) {
             {/* Confidence bar */}
             {confidence != null && (
               <div>
-                <div className="rounded-full overflow-hidden" style={{ height: 4, background: 'rgba(255,255,255,0.07)' }}>
+                <div className="rounded-full overflow-hidden" style={{ height: 4, background: 'var(--p-card-strong)' }}>
                   <div
                     className="h-full rounded-full transition-all"
                     style={{ width: `${confidence}%`, background: '#a78bfa' }}
@@ -396,6 +397,28 @@ export default function ATMDetail() {
   // Derive self-heal data from incidents list (find by incidentId)
   // We'll just use the incidents to infer what self-heals happened
 
+  const [liveLogs, setLiveLogs] = useState<any[]>([]);
+  const { status: logWsStatus, lastMessage: logWsMsg } =
+    useWebSocket(`ws://localhost:8000/ws/logs/${id}/`);
+
+  useEffect(() => {
+    if (!logWsMsg) return;
+    if (logWsMsg.type === 'log_entry' || logWsMsg.log_level) {
+      setLiveLogs(prev => [logWsMsg, ...prev].slice(0, 100));
+    }
+  }, [logWsMsg]);
+
+  useEffect(() => { setLiveLogs([]); }, [id]);
+
+  const allLogs = useMemo(() => {
+    const seen = new Set<string>();
+    return [...liveLogs, ...(logs as any[])].filter(l => {
+      const key = `${l.timestamp}:${l.eventCode ?? l.event_code}`;
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+  }, [liveLogs, logs]);
+
   const historyChronological = [...history].reverse() as any[];
 
   return (
@@ -405,7 +428,7 @@ export default function ATMDetail() {
         <Link
           to="/atm-map"
           className="w-8 h-8 rounded-xl flex items-center justify-center transition-all"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)' }}
+          style={{ background: 'var(--p-card-strong)', border: '1px solid var(--p-card-border)', color: 'rgba(255,255,255,0.6)' }}
           onMouseEnter={e => ((e.currentTarget as HTMLAnchorElement).style.color = 'white')}
           onMouseLeave={e => ((e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.6)')}
         >
@@ -415,7 +438,7 @@ export default function ATMDetail() {
           <h1 className="text-xl font-bold text-white">
             {atm?.name ?? `ATM #${id}`}
           </h1>
-          <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--p-heading-dim)' }}>
             {atm?.location ?? 'Device detail & history'}
           </p>
         </div>
@@ -438,14 +461,14 @@ export default function ATMDetail() {
       {atmLoading ? (
         <div
           className="rounded-2xl p-12 text-center text-sm"
-          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.3)' }}
+          style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)', color: 'var(--p-text-muted)' }}
         >
           Loading…
         </div>
       ) : atmError ? (
         <div
           className="rounded-2xl p-12 text-center space-y-4"
-          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+          style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
         >
           <AlertCircle size={36} style={{ color: '#f59e0b', margin: '0 auto' }} />
           <p className="text-sm font-semibold text-white">ATM not found</p>
@@ -456,7 +479,7 @@ export default function ATMDetail() {
           {/* Overview strip */}
           <div
             className="rounded-2xl p-6 flex flex-wrap items-center gap-8"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+            style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
           >
             {/* Health score ring */}
             <div className="flex flex-col items-center gap-2">
@@ -467,12 +490,12 @@ export default function ATMDetail() {
                     (atm?.healthScore ?? 0) >= 80 ? '#4ade80' :
                     (atm?.healthScore ?? 0) >= 60 ? '#f59e0b' : '#ef4444'
                   } ${(atm?.healthScore ?? 0) * 3.6}deg, rgba(255,255,255,0.06) 0deg)`,
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  border: '1px solid var(--p-card-border)',
                 }}
               >
                 <div
                   className="w-14 h-14 rounded-full flex items-center justify-center"
-                  style={{ background: '#0b0b0f' }}
+                  style={{ background: 'var(--p-gauge-inner)' }}
                 >
                   <span className="text-base font-bold text-white">{atm?.healthScore ?? '—'}</span>
                 </div>
@@ -491,14 +514,14 @@ export default function ATMDetail() {
                 <div
                   key={label}
                   className="rounded-xl p-3"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
                 >
                   <p className="text-[10px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{label}</p>
                   <p className="text-lg font-bold mt-0.5" style={{ color: value != null && (value as number) >= 80 ? color : value != null && (value as number) >= 60 ? '#f59e0b' : '#ef4444' }}>
                     {value != null ? `${value}` : '—'}
                   </p>
                   {value != null && (
-                    <div className="mt-1 rounded-full overflow-hidden" style={{ height: 2, background: 'rgba(255,255,255,0.07)' }}>
+                    <div className="mt-1 rounded-full overflow-hidden" style={{ height: 2, background: 'var(--p-card-strong)' }}>
                       <div className="h-full rounded-full" style={{ width: `${value}%`, background: color }} />
                     </div>
                   )}
@@ -524,18 +547,29 @@ export default function ATMDetail() {
           </div>
 
           {/* Tabs */}
-          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ borderBottom: '1px solid var(--p-card-border)' }}>
             {TABS.map(t => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className="px-5 py-2.5 text-sm font-medium transition-all"
                 style={{
-                  color: tab === t ? 'white' : 'rgba(255,255,255,0.4)',
-                  borderBottom: tab === t ? '2px solid rgba(255,255,255,0.7)' : '2px solid transparent',
+                  color: tab === t ? 'var(--p-heading)' : 'var(--p-heading-dim)',
+                  borderBottom: tab === t ? '2px solid var(--p-heading)' : '2px solid transparent',
                 }}
               >
-                {t}
+                {t === 'Logs' ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    {t}
+                    <span style={{ width: 6, height: 6, borderRadius: '50%',
+                      background: logWsStatus === 'open' ? '#4ade80' : '#6b7280',
+                      boxShadow: logWsStatus === 'open' ? '0 0 5px #4ade80' : 'none',
+                      display: 'inline-block', marginLeft: 2 }} />
+                    <span style={{ fontSize: 9, color: logWsStatus === 'open' ? '#4ade80' : 'rgba(255,255,255,0.3)' }}>
+                      {logWsStatus === 'open' ? 'LIVE' : ''}
+                    </span>
+                  </span>
+                ) : t}
               </button>
             ))}
           </div>
@@ -543,7 +577,7 @@ export default function ATMDetail() {
           {/* Tab content */}
           <div
             className="rounded-2xl overflow-hidden"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+            style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
           >
 
             {tab === 'Overview' && (
@@ -573,7 +607,7 @@ export default function ATMDetail() {
                     {atm ? Object.entries(atm)
                       .filter(([k]) => !['id', 'healthScore', 'networkScore', 'hardwareScore', 'softwareScore', 'transactionScore'].includes(k))
                       .map(([k, v]) => (
-                        <div key={k} className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div key={k} className="rounded-xl p-3" style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}>
                           <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>{k}</p>
                           <p className="text-sm text-white mt-1 break-all">{String(v ?? '—')}</p>
                         </div>
@@ -589,18 +623,18 @@ export default function ATMDetail() {
               ) : (
                 <table className="w-full">
                   <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                    <tr style={{ borderBottom: '1px solid var(--p-card-border)' }}>
                       <TH>Timestamp</TH><TH>Level</TH><TH>Event Code</TH><TH>Message</TH>
                     </tr>
                   </thead>
                   <tbody>
-                    {(logs as any[]).length === 0 ? (
+                    {allLogs.length === 0 ? (
                       <tr><td colSpan={4} className="px-5 py-10 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No logs.</td></tr>
-                    ) : (logs as any[]).map((l: any, i) => {
+                    ) : allLogs.map((l: any, i) => {
                       const ls = logStyle(l.logLevel || l.log_level);
                       return (
-                        <tr key={i} className="transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                          onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,0.025)'}
+                        <tr key={i} className="transition-colors" style={{ borderBottom: '1px solid var(--p-card-border)' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--p-card-hover)'}
                           onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
                         >
                           <td className="px-5 py-3.5 text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
@@ -629,7 +663,7 @@ export default function ATMDetail() {
               ) : (
                 <table className="w-full">
                   <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                    <tr style={{ borderBottom: '1px solid var(--p-card-border)' }}>
                       <TH>ID</TH><TH>Title</TH><TH>Severity</TH><TH>Status</TH><TH>Root Cause</TH><TH>AI Confidence</TH><TH>Created</TH>
                     </tr>
                   </thead>
@@ -640,8 +674,8 @@ export default function ATMDetail() {
                       const sv = sevStyle(inc.severity); const st = staStyle(inc.status);
                       const conf = inc.aiConfidence != null ? Math.round(inc.aiConfidence * 100) : null;
                       return (
-                        <tr key={inc.id} className="transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                          onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,0.025)'}
+                        <tr key={inc.id} className="transition-colors" style={{ borderBottom: '1px solid var(--p-card-border)' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--p-card-hover)'}
                           onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
                         >
                           <td className="px-5 py-3.5 text-xs font-mono" style={{ color: 'rgba(255,255,255,0.28)' }}>{inc.incidentId || inc.id}</td>
@@ -652,7 +686,7 @@ export default function ATMDetail() {
                           <td className="px-5 py-3.5">
                             {conf != null ? (
                               <div className="flex items-center gap-2">
-                                <div className="rounded-full overflow-hidden" style={{ width: 40, height: 3, background: 'rgba(255,255,255,0.07)' }}>
+                                <div className="rounded-full overflow-hidden" style={{ width: 40, height: 3, background: 'var(--p-card-strong)' }}>
                                   <div className="h-full rounded-full" style={{ width: `${conf}%`, background: '#a78bfa' }} />
                                 </div>
                                 <span className="text-[11px] font-bold" style={{ color: '#a78bfa' }}>{conf}%</span>
@@ -677,7 +711,7 @@ export default function ATMDetail() {
                   {historyChronological.length >= 2 && (
                     <div
                       className="rounded-xl p-4"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+                      style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
                     >
                       <div className="flex items-center gap-2 mb-3">
                         <Activity size={13} style={{ color: '#60a5fa' }} />
@@ -692,7 +726,7 @@ export default function ATMDetail() {
 
                   <table className="w-full">
                     <thead>
-                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                      <tr style={{ borderBottom: '1px solid var(--p-card-border)' }}>
                         <TH>Timestamp</TH><TH>Health</TH><TH>Network</TH><TH>Hardware</TH><TH>Software</TH><TH>Transaction</TH>
                       </tr>
                     </thead>
@@ -700,8 +734,8 @@ export default function ATMDetail() {
                       {(history as any[]).length === 0 ? (
                         <tr><td colSpan={6} className="px-5 py-10 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No history.</td></tr>
                       ) : (history as any[]).map((h: any, i) => (
-                        <tr key={i} className="transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                          onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,0.025)'}
+                        <tr key={i} className="transition-colors" style={{ borderBottom: '1px solid var(--p-card-border)' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--p-card-hover)'}
                           onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
                         >
                           <td className="px-5 py-3.5 text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>{formatDateTime(h.timestamp)}</td>
@@ -746,7 +780,7 @@ export default function ATMDetail() {
                         <div
                           key={inc.id}
                           className="rounded-xl p-4 flex items-start gap-4"
-                          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                          style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
                         >
                           <div
                             className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
