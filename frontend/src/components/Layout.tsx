@@ -2,12 +2,13 @@ import React, { useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Map, AlertTriangle, Brain,
-  ShieldAlert, MessageSquare, Settings, LogOut, Activity,
+  ShieldAlert, MessageSquare, Settings, LogOut, Activity, ScrollText,
 } from 'lucide-react';
 
 const NAV = [
   { to: '/dashboard',      label: 'Dashboard',      Icon: LayoutDashboard },
   { to: '/atm-map',        label: 'ATM Network',    Icon: Map             },
+  { to: '/logs',           label: 'Logs',           Icon: ScrollText      },
   { to: '/incidents',      label: 'Incidents',      Icon: AlertTriangle   },
   { to: '/ai-analysis',    label: 'AI Analysis',    Icon: Brain           },
   { to: '/anomaly',        label: 'Anomaly',        Icon: ShieldAlert     },
@@ -32,7 +33,7 @@ export default function Layout() {
   };
 
   return (
-    <div className="flex min-h-screen" style={{ background: '#0b0b0f', zoom: 1.1 }}>
+    <div className="flex min-h-screen" style={{ background: '#0b0b0f' }}>
       {/* Sidebar */}
       <aside
         className="fixed inset-y-0 left-0 w-60 flex flex-col z-40"
@@ -44,7 +45,7 @@ export default function Layout() {
       >
         {/* Logo */}
         <div
-          className="px-6 py-5 flex items-center gap-3"
+          className="px-6 py-4 flex items-center gap-3"
           style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
         >
           <div
@@ -82,7 +83,7 @@ export default function Layout() {
               key={to}
               to={to}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+                `flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
                   isActive
                     ? 'text-white'
                     : 'text-white/40 hover:text-white/80'
@@ -137,7 +138,7 @@ export default function Layout() {
           {/* Logout */}
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-white/40 hover:text-white/80 hover:bg-white/5"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 text-white/40 hover:text-white/80 hover:bg-white/5"
             style={{ border: '1px solid transparent' }}
           >
             <LogOut size={15} />

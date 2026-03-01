@@ -13,7 +13,8 @@ urlpatterns = [
     path('atms/<int:id>/logs/',            views.atm_logs),
     path('atms/<int:id>/incidents/',       views.atm_incidents),
     path('atms/<int:id>/health-history/',  views.atm_health_history),
-    path('atms/<int:id>/reset-health/',    views.atm_reset_health),
+    path('atms/<int:id>/reset-health/',         views.atm_reset_health),
+    path('atms/<int:id>/transaction-volume/',   views.atm_transaction_volume),
 
     # CHANNELS
     path('channels/',           views.channel_list),
@@ -33,6 +34,7 @@ urlpatterns = [
     path('ai/analyze-log/',       views.ai_analyze_log),
     path('ai/predictions/',       views.ai_predictions),
     path('ai/root-cause-stats/',  views.ai_root_cause_stats),
+    path('ai/failure-trend/',     views.ai_failure_trend),
 
     # SELF HEAL
     path('self-heal/actions/',  views.self_heal_actions),
@@ -51,4 +53,7 @@ urlpatterns = [
     path('simulator/start/',   views.simulator_start),
     path('simulator/stop/',    views.simulator_stop),
     path('simulator/status/',  views.simulator_status),
+
+    # PIPELINE FEED (REST fallback for live feed)
+    path('pipeline/events/',   views.recent_pipeline_events),
 ]

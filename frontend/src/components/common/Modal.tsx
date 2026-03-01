@@ -53,7 +53,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
             <X size={16} />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-6 overflow-y-auto" style={{ maxHeight: '80vh' }}>{children}</div>
       </div>
     </div>
   );

@@ -3,7 +3,8 @@ import { useSelector } from 'react-redux';
 import {
   Brain, Play, Square, Activity, AlertTriangle, CheckCircle,
   Zap, Wifi, WifiOff, Loader, BarChart2, ChevronDown, ChevronUp,
-  X, Info, Shield, Network, HardDrive, CreditCard,
+  X, Info, Shield, Network, HardDrive, CreditCard, Search,
+  TrendingDown, Server,
 } from 'lucide-react';
 import {
   useStartSimulatorMutation,
@@ -11,6 +12,10 @@ import {
   useGetSimulatorStatusQuery,
   useGetIncidentsQuery,
   useGetRootCauseStatsQuery,
+  useAnalyzeLogMutation,
+  useGetATMsQuery,
+  useGetAIFailureTrendQuery,
+  useGetRecentPipelineEventsQuery,
 } from '../services/pulseApi';
 import { usePipelineSocket, PipelineEvent } from '../hooks/usePipelineSocket';
 import { RootState } from '../store';
@@ -36,6 +41,9 @@ const CATEGORY_COLOR: Record<string, string> = {
   HARDWARE: '#f97316',
   CASH_JAM: '#f59e0b',
   FRAUD:    '#ef4444',
+  SERVER:   '#a78bfa',
+  TIMEOUT:  '#fb923c',
+  SWITCH:   '#34d399',
   UNKNOWN:  '#6b7280',
 };
 
@@ -55,6 +63,19 @@ const CATEGORY_ICON: Record<string, typeof Network> = {
   CASH_JAM: HardDrive,
   FRAUD:    Shield,
   UNKNOWN:  Info,
+  SERVER:   Server,
+  TIMEOUT:  CreditCard,
+};
+
+const SELF_HEAL_MAP: Record<string, string> = {
+  NETWORK:  'SWITCH_NETWORK',
+  SWITCH:   'RESTART_SERVICE',
+  SERVER:   'RESTART_SERVICE',
+  TIMEOUT:  'FLUSH_CACHE',
+  CASH_JAM: 'ALERT_ENGINEER',
+  FRAUD:    'FREEZE_ATM',
+  HARDWARE: 'ALERT_ENGINEER',
+  UNKNOWN:  'ALERT_ENGINEER',
 };
 
 function severityReason(ev: PipelineEvent): string {
@@ -161,9 +182,9 @@ function DetailPanel({ ev, onClose }: { ev: PipelineEvent; onClose: () => void }
         <div className="flex items-center gap-2 flex-wrap">
           <LevelPill level={ev.log.logLevel} />
           <span className="text-sm font-bold text-white">{ev.log.eventCode}</span>
-          {ev.atm && (
+          {(ev as any).atm && (
             <span className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-              @ {ev.atm.name}
+              @ {(ev as any).atm.name}
             </span>
           )}
         </div>
@@ -177,7 +198,7 @@ function DetailPanel({ ev, onClose }: { ev: PipelineEvent; onClose: () => void }
 
       <div className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
         {t.toLocaleDateString('en-IN')} · {t.toLocaleTimeString('en-IN')}
-        {ev.atm && ` · Health: ${ev.atm.healthScore}%`}
+        {(ev as any).atm && ` · Health: ${(ev as any).atm.healthScore}%`}
       </div>
 
       {/* AI Classification */}
@@ -248,9 +269,6 @@ function DetailPanel({ ev, onClose }: { ev: PipelineEvent; onClose: () => void }
               </span>
             )}
           </div>
-          {cl.recommendedAction && (
-            <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{cl.recommendedAction}</p>
-          )}
         </div>
       )}
 
@@ -275,7 +293,6 @@ function DetailPanel({ ev, onClose }: { ev: PipelineEvent; onClose: () => void }
           </div>
           <p className="text-xs text-white font-medium">{inc.title}</p>
 
-          {/* Why critical */}
           {reason && (
             <div
               className="rounded-lg p-2.5 mt-1"
@@ -329,18 +346,15 @@ function EventRow({
               : '1px solid rgba(255,255,255,0.04)',
         }}
       >
-        {/* Level */}
         <div className="mt-0.5">
           <LevelPill level={ev.log.logLevel} />
         </div>
-
-        {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold text-white">{ev.log.eventCode}</span>
-            {ev.atm && (
+            {(ev as any).atm && (
               <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                @ {ev.atm.name}
+                @ {(ev as any).atm.name}
               </span>
             )}
             {cl && (
@@ -370,8 +384,6 @@ function EventRow({
             </div>
           )}
         </div>
-
-        {/* Right side */}
         <div className="flex flex-col items-end gap-1 shrink-0">
           <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{timeStr}</span>
           {isExpanded
@@ -381,11 +393,409 @@ function EventRow({
         </div>
       </button>
 
-      {/* Expanded detail */}
       {isExpanded && (
         <div className="mt-1 ml-2">
           <DetailPanel ev={ev} onClose={onClick} />
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── AI Log Analyzer ──────────────────────────────────────────────────────────
+
+function AILogAnalyzer() {
+  const [logText, setLogText] = useState('');
+  const [analyzeLog, { isLoading, data: result, reset }] = useAnalyzeLogMutation();
+
+  const handleAnalyze = async () => {
+    if (!logText.trim()) return;
+    await analyzeLog({ message: logText });
+  };
+
+  const catColor = result ? (CATEGORY_COLOR[result.category] ?? '#6b7280') : '#6b7280';
+  const CatIcon  = result ? (CATEGORY_ICON[result.category] ?? Info) : Info;
+  const conf     = result?.confidence != null ? Math.round(result.confidence * 100) : null;
+  const healKey  = result ? (SELF_HEAL_MAP[result.category] ?? 'ALERT_ENGINEER') : null;
+
+  const EXAMPLE_LOGS = [
+    '[2024-01-15 14:32:11] ATM-MUMBAI-001 HARDWARE_JAM CRITICAL: Cash dispenser jammed, motor failure detected',
+    '[2024-01-15 14:33:45] ATM-DELHI-003 NETWORK_TIMEOUT ERROR: Connection to payment gateway timed out after 30s',
+    '[2024-01-15 14:35:02] ATM-BENGALURU-002 MALWARE_SIGNATURE CRITICAL: Suspicious card skimming pattern detected',
+  ];
+
+  return (
+    <div
+      className="rounded-2xl p-4 flex flex-col gap-4"
+      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+    >
+      <div className="flex items-center gap-2">
+        <Search size={14} style={{ color: '#a855f7' }} />
+        <span className="text-sm font-semibold text-white">AI Log Analyzer</span>
+        <span className="text-[10px] ml-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
+          Paste any raw log → instant AI classification
+        </span>
+      </div>
+
+      {/* Textarea */}
+      <textarea
+        value={logText}
+        onChange={e => { setLogText(e.target.value); if (result) reset(); }}
+        rows={3}
+        placeholder="Paste raw log entry here…&#10;e.g. [2024-01-15 14:32:11] ATM-001 HARDWARE_JAM CRITICAL: Cash dispenser jammed"
+        className="w-full px-3 py-2.5 resize-none text-xs font-mono"
+        style={{
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          color: 'white',
+          borderRadius: 10,
+          outline: 'none',
+        }}
+      />
+
+      {/* Example pills */}
+      <div className="flex flex-wrap gap-1.5">
+        <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Examples:</span>
+        {EXAMPLE_LOGS.map((ex, i) => (
+          <button
+            key={i}
+            onClick={() => { setLogText(ex); if (result) reset(); }}
+            className="text-[10px] px-2 py-0.5 rounded-lg transition-all"
+            style={{
+              background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)', color: '#a855f7',
+            }}
+          >
+            Example {i + 1}
+          </button>
+        ))}
+      </div>
+
+      <button
+        onClick={handleAnalyze}
+        disabled={isLoading || !logText.trim()}
+        className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all disabled:opacity-40"
+        style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#a855f7' }}
+      >
+        {isLoading
+          ? <><Loader size={13} className="animate-spin" /> Analyzing…</>
+          : <><Brain size={13} /> Analyze with AI</>
+        }
+      </button>
+
+      {/* Result */}
+      {result && (
+        <div
+          className="rounded-xl p-4 space-y-3"
+          style={{ background: `${catColor}0a`, border: `1px solid ${catColor}25` }}
+        >
+          <div className="flex items-center gap-2">
+            <CatIcon size={14} style={{ color: catColor }} />
+            <span className="text-xs font-bold uppercase tracking-wide" style={{ color: catColor }}>
+              AI Classification Result
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[9px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Category</p>
+              <p className="text-sm font-bold mt-0.5" style={{ color: catColor }}>{result.category ?? 'INFO'}</p>
+            </div>
+            <div className="rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[9px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Event Code</p>
+              <p className="text-xs font-bold font-mono mt-0.5 text-white">{result.parsedEventCode ?? '—'}</p>
+            </div>
+            <div className="rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[9px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Level</p>
+              <p className="text-xs font-bold mt-0.5" style={{ color: LEVEL_COLOR[result.parsedLogLevel] ?? '#6b7280' }}>
+                {result.parsedLogLevel ?? '—'}
+              </p>
+            </div>
+          </div>
+
+          {conf != null && (
+            <div>
+              <div className="flex justify-between text-[9px] mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                <span>AI Confidence</span>
+                <span style={{ color: catColor, fontWeight: 700 }}>{conf}%</span>
+              </div>
+              <div className="rounded-full overflow-hidden" style={{ height: 5, background: 'rgba(255,255,255,0.07)' }}>
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${conf}%`, background: catColor }}
+                />
+              </div>
+            </div>
+          )}
+
+          {result.detail && (
+            <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.55)' }}>{result.detail}</p>
+          )}
+
+          {healKey && result.category !== 'INFO' && (
+            <div
+              className="flex items-center gap-2 px-3 py-2 rounded-xl"
+              style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)' }}
+            >
+              <Zap size={11} style={{ color: '#4ade80' }} />
+              <span className="text-xs font-semibold" style={{ color: '#4ade80' }}>
+                Recommended: {HEAL_LABEL[healKey] ?? healKey}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── At-Risk ATMs Panel ───────────────────────────────────────────────────────
+
+function AtRiskATMs() {
+  const { data: atms = [] } = useGetATMsQuery(undefined, { pollingInterval: 10000 });
+
+  const sorted = [...(atms as any[])]
+    .sort((a, b) => (a.healthScore ?? 100) - (b.healthScore ?? 100))
+    .slice(0, 6);
+
+  if (sorted.length === 0) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>No ATM data available</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {sorted.map((atm: any) => {
+        const score = atm.healthScore ?? 100;
+        const color = score >= 80 ? '#4ade80' : score >= 60 ? '#f59e0b' : '#ef4444';
+        const risk  = score < 50 ? 'HIGH' : score < 70 ? 'MEDIUM' : 'LOW';
+        const riskColor = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#4ade80' }[risk];
+
+        return (
+          <div
+            key={atm.id}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+            style={{
+              background: `${color}06`,
+              border: `1px solid ${color}18`,
+            }}
+          >
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: `${color}15`, border: `1px solid ${color}30` }}
+            >
+              <TrendingDown size={12} style={{ color }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-white truncate">{atm.name}</p>
+              <p className="text-[10px] truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                {atm.location}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-0.5 shrink-0">
+              <span className="text-sm font-bold" style={{ color }}>{score}</span>
+              <span
+                className="text-[9px] px-1.5 py-0.5 rounded-full font-bold"
+                style={{ color: riskColor, background: `${riskColor}15` }}
+              >
+                {risk} RISK
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Donut Chart (Root Cause) ─────────────────────────────────────────────────
+
+function DonutChart({ stats }: { stats: any[] }) {
+  if (stats.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>No data yet</p>
+      </div>
+    );
+  }
+
+  const SIZE  = 160;
+  const CX    = SIZE / 2;
+  const CY    = SIZE / 2;
+  const R     = 58;
+  const INNER = 34;
+  const total = stats.reduce((s: number, d: any) => s + (d.count ?? 0), 0);
+
+  let startAngle = -90;
+  const segments = stats.map((s: any) => {
+    const pct    = total > 0 ? (s.count / total) : 0;
+    const angle  = pct * 360;
+    const color  = CATEGORY_COLOR[s.category] ?? '#6b7280';
+    const seg    = { ...s, startAngle, angle, pct, color };
+    startAngle  += angle;
+    return seg;
+  });
+
+  function polarToXY(angle: number, r: number) {
+    const rad = (angle * Math.PI) / 180;
+    return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) };
+  }
+
+  function arcPath(start: number, angle: number) {
+    if (angle >= 360) angle = 359.99;
+    const p1 = polarToXY(start, R);
+    const p2 = polarToXY(start + angle, R);
+    const i1 = polarToXY(start + angle, INNER);
+    const i2 = polarToXY(start, INNER);
+    const large = angle > 180 ? 1 : 0;
+    return `M ${p1.x} ${p1.y} A ${R} ${R} 0 ${large} 1 ${p2.x} ${p2.y} L ${i1.x} ${i1.y} A ${INNER} ${INNER} 0 ${large} 0 ${i2.x} ${i2.y} Z`;
+  }
+
+  const top = stats[0];
+
+  return (
+    <div className="flex items-start gap-4">
+      {/* SVG donut */}
+      <div className="shrink-0 relative" style={{ width: SIZE, height: SIZE }}>
+        <svg width={SIZE} height={SIZE}>
+          {segments.map((seg, i) => (
+            <path
+              key={i}
+              d={arcPath(seg.startAngle, seg.angle)}
+              fill={seg.color}
+              opacity="0.85"
+              stroke="rgba(11,11,15,0.6)"
+              strokeWidth="1.5"
+            />
+          ))}
+          {/* Centre label */}
+          <text x={CX} y={CY - 6} textAnchor="middle" style={{ fontSize: 11, fill: 'white', fontWeight: 700 }}>
+            {total}
+          </text>
+          <text x={CX} y={CY + 8} textAnchor="middle" style={{ fontSize: 7, fill: 'rgba(255,255,255,0.4)' }}>
+            incidents
+          </text>
+        </svg>
+      </div>
+
+      {/* Legend */}
+      <div className="flex-1 flex flex-col gap-1.5 pt-1">
+        {segments.map((seg, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
+            <span className="text-[11px] flex-1" style={{ color: 'rgba(255,255,255,0.75)' }}>{seg.category}</span>
+            <span className="text-[11px] font-bold" style={{ color: seg.color }}>{seg.count}</span>
+            <span className="text-[10px] w-9 text-right" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              {Math.round(seg.pct * 100)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── 7-Day Failure Trend ──────────────────────────────────────────────────────
+
+function FailureTrendChart() {
+  const { data } = useGetAIFailureTrendQuery(undefined, { pollingInterval: 10000 });
+  const trend: any[] = data?.trend ?? [];
+
+  const maxCount = Math.max(1, ...trend.map(d => d.count));
+  const W = 320; const H = 100; const padL = 24; const padR = 8; const padT = 10; const padB = 22;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  function toXY(i: number, val: number) {
+    return {
+      x: padL + (i / Math.max(trend.length - 1, 1)) * chartW,
+      y: padT + chartH - (val / maxCount) * chartH,
+    };
+  }
+
+  const totalLine = trend.map((d, i) => { const p = toXY(i, d.count);    return `${p.x},${p.y}`; }).join(' ');
+  const critLine  = trend.map((d, i) => { const p = toXY(i, d.critical); return `${p.x},${p.y}`; }).join(' ');
+  const resLine   = trend.map((d, i) => { const p = toXY(i, d.resolved); return `${p.x},${p.y}`; }).join(' ');
+
+  const first = trend.length > 0 ? toXY(0, trend[0].count) : null;
+  const last  = trend.length > 0 ? toXY(trend.length - 1, trend[trend.length - 1].count) : null;
+  const areaPath = trend.length > 1
+    ? `M ${first!.x} ${padT + chartH} L ${totalLine.split(' ').join(' L ')} L ${last!.x} ${padT + chartH} Z`
+    : '';
+
+  const totalIncidents = trend.reduce((s, d) => s + d.count, 0);
+  const todayCount = trend.length > 0 ? trend[trend.length - 1].count : 0;
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Summary chips */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full" style={{ background: '#60a5fa' }} />
+          <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Total</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full" style={{ background: '#ef4444' }} />
+          <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Critical</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full" style={{ background: '#4ade80' }} />
+          <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Resolved</span>
+        </div>
+        <span className="ml-auto text-[10px] font-semibold" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          {totalIncidents} total · {todayCount} today
+        </span>
+      </div>
+
+      {trend.length === 0 ? (
+        <div className="flex items-center justify-center rounded-xl" style={{ height: H, background: 'rgba(255,255,255,0.02)' }}>
+          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>No incident history yet</p>
+        </div>
+      ) : (
+        <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ height: H }}>
+          <defs>
+            <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+          {/* Y-axis grid */}
+          {[0, 0.5, 1].map(t => {
+            const y = padT + chartH - t * chartH;
+            return (
+              <g key={t}>
+                <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                <text x={padL - 3} y={y + 3} textAnchor="end" style={{ fontSize: 7, fill: 'rgba(255,255,255,0.22)' }}>
+                  {Math.round(maxCount * t)}
+                </text>
+              </g>
+            );
+          })}
+          {/* Area fill */}
+          {areaPath && <path d={areaPath} fill="url(#trendGrad)" />}
+          {/* Lines */}
+          {trend.length > 1 && (
+            <>
+              <polyline points={totalLine} fill="none" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <polyline points={critLine}  fill="none" stroke="#ef4444" strokeWidth="1"   strokeLinecap="round" strokeLinejoin="round" strokeDasharray="3 2" />
+              <polyline points={resLine}   fill="none" stroke="#4ade80" strokeWidth="1"   strokeLinecap="round" strokeLinejoin="round" strokeDasharray="3 2" />
+            </>
+          )}
+          {/* Dots + day labels */}
+          {trend.map((d, i) => {
+            const p = toXY(i, d.count);
+            return (
+              <g key={i}>
+                <circle cx={p.x} cy={p.y} r="2.5" fill="#60a5fa" stroke="#0b0b0f" strokeWidth="1.5" />
+                <text x={p.x} y={H - 5} textAnchor="middle" style={{ fontSize: 7, fill: 'rgba(255,255,255,0.3)' }}>
+                  {d.dayShort}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
       )}
     </div>
   );
@@ -404,8 +814,22 @@ export default function AIAnalysisPage() {
 
   const { status: wsStatus } = usePipelineSocket();
 
-  // Read persisted events from Redux (survive navigation)
-  const events = useSelector((s: RootState) => s.pipeline.events);
+  // REST poll — primary source (WS InMemoryChannelLayer doesn't cross thread boundaries)
+  const { data: restEvents = [] } = useGetRecentPipelineEventsQuery(undefined, { pollingInterval: 3000 });
+
+  // Merge WS events (real-time bonus) with REST events, deduplicated by log.id
+  const wsEvents = useSelector((s: RootState) => s.pipeline.events);
+  const events = (() => {
+    const seen = new Set<number>();
+    const merged: typeof wsEvents = [];
+    [...wsEvents, ...restEvents].forEach((ev: any) => {
+      if (ev?.log?.id != null && !seen.has(ev.log.id)) {
+        seen.add(ev.log.id);
+        merged.push(ev);
+      }
+    });
+    return merged;
+  })();
 
   const running = simStatus?.running ?? false;
 
@@ -442,13 +866,12 @@ export default function AIAnalysisPage() {
           <div>
             <h1 className="text-xl font-bold text-white">AI Automation Pipeline</h1>
             <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              FinEdge · Logs → AI classify → auto-incidents → self-heal · Click any log for analysis
+              Logs → AI classify → auto-incidents → self-heal · Click any log for analysis
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* WS status */}
           <div
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
@@ -461,7 +884,6 @@ export default function AIAnalysisPage() {
             }
           </div>
 
-          {/* Start / Stop */}
           <button
             onClick={() => running ? stopSim() : startSim()}
             className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-all"
@@ -502,7 +924,6 @@ export default function AIAnalysisPage() {
             className="rounded-2xl p-4 flex flex-col gap-3"
             style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
           >
-            {/* Feed header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Activity size={14} style={{ color: '#60a5fa' }} />
@@ -514,14 +935,11 @@ export default function AIAnalysisPage() {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                  {events.length} events · click to inspect
-                </span>
-              </div>
+              <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                {events.length} events · click to inspect
+              </span>
             </div>
 
-            {/* Legend */}
             <div className="flex items-center gap-4">
               {[
                 { label: 'Critical', color: '#ef4444' },
@@ -539,10 +957,9 @@ export default function AIAnalysisPage() {
               </span>
             </div>
 
-            {/* Feed list */}
-            <div className="flex flex-col gap-1.5 overflow-y-auto" style={{ maxHeight: '520px' }}>
+            <div className="flex flex-col gap-1.5 overflow-y-auto" style={{ maxHeight: '420px' }}>
               {events.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
                   {running ? (
                     <>
                       <Loader size={24} className="animate-spin" style={{ color: 'rgba(255,255,255,0.2)' }} />
@@ -572,10 +989,31 @@ export default function AIAnalysisPage() {
               )}
             </div>
           </div>
+
+          {/* AI Log Analyzer */}
+          <AILogAnalyzer />
         </div>
 
         {/* Right column */}
         <div className="flex flex-col gap-3" style={{ width: '340px' }}>
+
+          {/* At-Risk ATMs */}
+          <div
+            className="rounded-2xl p-4 flex flex-col gap-3"
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            <div className="flex items-center gap-2">
+              <TrendingDown size={14} style={{ color: '#ef4444' }} />
+              <span className="text-sm font-semibold text-white">At-Risk ATMs</span>
+              <span
+                className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}
+              >
+                Health score ↓
+              </span>
+            </div>
+            <AtRiskATMs />
+          </div>
 
           {/* Recent Incidents */}
           <div
@@ -629,7 +1067,7 @@ export default function AIAnalysisPage() {
             </div>
           </div>
 
-          {/* Root Cause Breakdown */}
+          {/* Root Cause Breakdown — Donut */}
           <div
             className="rounded-2xl p-4 flex flex-col gap-3"
             style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
@@ -638,32 +1076,19 @@ export default function AIAnalysisPage() {
               <BarChart2 size={14} style={{ color: '#a855f7' }} />
               <span className="text-sm font-semibold text-white">Root Cause Breakdown</span>
             </div>
-            {stats.length === 0 ? (
-              <p className="text-xs py-4 text-center" style={{ color: 'rgba(255,255,255,0.3)' }}>No data yet</p>
-            ) : (
-              <div className="flex flex-col gap-2.5">
-                {stats.map((s: any) => {
-                  const color = CATEGORY_COLOR[s.category] ?? '#6b7280';
-                  return (
-                    <div key={s.category} className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold" style={{ color }}>{s.category}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{s.percentage}%</span>
-                          <span className="text-[10px] font-bold text-white">{s.count}</span>
-                        </div>
-                      </div>
-                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                        <div
-                          className="h-full rounded-full transition-all duration-700"
-                          style={{ width: `${s.percentage}%`, background: color }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <DonutChart stats={stats} />
+          </div>
+
+          {/* 7-Day Failure Trend */}
+          <div
+            className="rounded-2xl p-4 flex flex-col gap-3"
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            <div className="flex items-center gap-2">
+              <Activity size={14} style={{ color: '#60a5fa' }} />
+              <span className="text-sm font-semibold text-white">7-Day Failure Trend</span>
+            </div>
+            <FailureTrendChart />
           </div>
 
           {/* Pipeline Flow */}

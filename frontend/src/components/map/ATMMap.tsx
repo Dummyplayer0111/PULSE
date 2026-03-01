@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
@@ -15,7 +15,10 @@ const STATUS_COLOR: Record<string, string> = {
   MAINTENANCE: '#6b7280',
 };
 
-/** Build a Leaflet DivIcon matching the dark dashboard theme */
+// Restrict map to India
+const INDIA_BOUNDS: L.LatLngBoundsExpression = [[6.5, 68.0], [35.7, 97.5]];
+const INDIA_CENTER: L.LatLngExpression = [22.0, 82.5];
+
 function makeIcon(status: string, isSelected: boolean) {
   const color = STATUS_COLOR[status] ?? '#6b7280';
   const size  = isSelected ? 44 : 36;
@@ -38,27 +41,31 @@ function makeIcon(status: string, isSelected: boolean) {
         box-shadow:0 0 6px ${color};
       "></div>
     </div>`;
-  return L.divIcon({
-    html,
-    className: '',
-    iconSize:   [size, size],
-    iconAnchor: [size / 2, size],
-    popupAnchor:[0, -size],
-  });
+  return L.divIcon({ html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size], popupAnchor: [0, -size] });
 }
 
-/** Auto-fit map bounds when ATMs list changes */
+/** Fit to ATM bounds once on first data load */
 function FitBounds({ atms }: { atms: any[] }) {
   const map = useMap();
-  const coords = atms.filter(a => a.latitude && a.longitude).map(a => [a.latitude, a.longitude] as [number, number]);
-  React.useEffect(() => {
-    if (coords.length === 0) return;
-    if (coords.length === 1) {
-      map.setView(coords[0], 12);
-    } else {
-      map.fitBounds(coords, { padding: [60, 60], maxZoom: 12 });
-    }
+  const hasFitted = useRef(false);
+  const coords = atms
+    .filter(a => a.latitude && a.longitude)
+    .map(a => [a.latitude, a.longitude] as [number, number]);
+
+  useEffect(() => {
+    if (hasFitted.current || coords.length === 0) return;
+    hasFitted.current = true;
+    // Short delay — map container is stable (overlay approach, no resize)
+    const t = setTimeout(() => {
+      if (coords.length === 1) {
+        map.setView(coords[0], 12);
+      } else {
+        map.fitBounds(coords as L.LatLngBoundsExpression, { padding: [50, 50], maxZoom: 12, animate: false });
+      }
+    }, 250);
+    return () => clearTimeout(t);
   }, [coords.length]);
+
   return null;
 }
 
@@ -67,12 +74,15 @@ export default function ATMMap({ atms, selectedId, onATMClick }: ATMMapProps) {
 
   return (
     <MapContainer
-      center={[20.5937, 78.9629]}
+      center={INDIA_CENTER}
       zoom={5}
-      style={{ width: '100%', height: '100%', borderRadius: '1rem' }}
+      minZoom={4}
+      maxZoom={18}
+      maxBounds={INDIA_BOUNDS}
+      maxBoundsViscosity={0.85}
+      style={{ width: '100%', height: '100%' }}
       zoomControl={true}
     >
-      {/* CartoDB Dark Matter tiles — free, no API key */}
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -89,10 +99,7 @@ export default function ATMMap({ atms, selectedId, onATMClick }: ATMMapProps) {
           icon={makeIcon(atm.status, atm.id === selectedId)}
           eventHandlers={{ click: () => onATMClick(atm) }}
         >
-          <Popup
-            closeButton={false}
-            className="atm-popup"
-          >
+          <Popup closeButton={false} className="atm-popup">
             <div style={{
               background: 'rgba(14,14,20,0.97)',
               border: '1px solid rgba(255,255,255,0.12)',

@@ -83,7 +83,7 @@ export default function Communications() {
   };
 
   return (
-    <div className="p-8 space-y-6" style={{ minHeight: '100vh' }}>
+    <div className="p-6 space-y-4" style={{ minHeight: '100vh' }}>
 
       {/* Header */}
       <div className="flex items-center gap-3">
@@ -94,7 +94,7 @@ export default function Communications() {
           <MessageSquare size={16} style={{ color: '#60a5fa' }} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-white">Communications</h1>
+          <h1 className="text-xl font-bold text-white">Communications</h1>
           <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
             Send customer notifications and manage message templates
           </p>

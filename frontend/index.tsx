@@ -13,6 +13,7 @@ import AIAnalysis      from './src/pages/AIAnalysis';
 import Anomaly         from './src/pages/Anomaly';
 import Communications  from './src/pages/Communications';
 import Settings        from './src/pages/Settings';
+import Logs            from './src/pages/Logs';
 import { Brain, Zap, ShieldAlert, Globe, Activity, TrendingUp, ArrowRight, ChevronRight } from 'lucide-react';
 
 // ─── GLOW CARD (Stripe-style hover) ──────────────────────────────────────────
@@ -784,13 +785,14 @@ function LoginPage() {
         navigate('/dashboard');
       } else {
         const n = attempts + 1; setAttempts(n);
+        const msg = data?.detail || data?.non_field_errors?.[0] || 'Invalid credentials. Please try again.';
         if (n >= 5) { setLocked(true); setError('Account locked. Contact your administrator.'); }
-        else { setError('Invalid credentials. Please try again.'); setShake(true); setTimeout(()=>setShake(false),500); }
+        else { setError(msg); setShake(true); setTimeout(()=>setShake(false),500); }
       }
-    } catch {
+    } catch (err: any) {
       const n = attempts + 1; setAttempts(n);
       if (n >= 5) { setLocked(true); setError('Account locked. Contact your administrator.'); }
-      else { setError('Invalid credentials. Please try again.'); setShake(true); setTimeout(()=>setShake(false),500); }
+      else { setError('Cannot reach backend at localhost:8000 — is Django running?'); setShake(true); setTimeout(()=>setShake(false),500); }
     } finally { setLoading(false); }
   };
 
@@ -985,6 +987,7 @@ function App() {
             <Route path="/dashboard"      element={<Dashboard />} />
             <Route path="/atm-map"        element={<ATMMapPage />} />
             <Route path="/atm-detail/:id" element={<ATMDetail />} />
+            <Route path="/logs"           element={<Logs />} />
             <Route path="/incidents"      element={<Incidents />} />
             <Route path="/ai-analysis"    element={<AIAnalysis />} />
             <Route path="/anomaly"        element={<Anomaly />} />

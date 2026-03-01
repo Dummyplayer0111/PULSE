@@ -28,7 +28,10 @@ SEVERITY_CHOICES = [
 
 INCIDENT_STATUS_CHOICES = [
     ("OPEN", "OPEN"),
+    ("INVESTIGATING", "INVESTIGATING"),
+    ("AUTO_RESOLVED", "AUTO_RESOLVED"),
     ("RESOLVED", "RESOLVED"),
+    ("ESCALATED", "ESCALATED"),
 ]
 
 SOURCE_TYPE_CHOICES = [
@@ -109,6 +112,8 @@ class Incident(models.Model):
     triggeringLogId = models.UUIDField()
     contributingLogIds = models.JSONField(default=list)
 
+    rootCauseDetail = models.TextField(blank=True, default='')
+    resolvedAt = models.DateTimeField(null=True, blank=True)
     assignedTo = models.UUIDField(null=True, blank=True)
 
     createdAt = models.DateTimeField(default=timezone.now)
@@ -143,6 +148,7 @@ class LogEntry(models.Model):
     dedupHash = models.CharField(max_length=128)
 
     incidentId = models.UUIDField(null=True, blank=True)
+    processed = models.BooleanField(default=False)
 
     createdAt = models.DateTimeField(default=timezone.now)
 
@@ -204,7 +210,9 @@ class AnomalyFlag(models.Model):
     )
 
     contributingLogIds = models.JSONField(default=list)
+    description = models.TextField(null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
+    logEntryId = models.IntegerField(null=True, blank=True)
 
     createdAt = models.DateTimeField(default=timezone.now)
 
@@ -219,17 +227,26 @@ class Alert(models.Model):
     alertType = models.CharField(
         max_length=20,
         choices=ALERT_TYPE_CHOICES,
-        default="REACTIVE"   # ← Add this
+        default="REACTIVE"
     )
 
     title = models.CharField(max_length=255)
     message = models.TextField()
+
+    severity = models.CharField(
+        max_length=10,
+        choices=SEVERITY_CHOICES,
+        default="MEDIUM"
+    )
 
     status = models.CharField(
         max_length=20,
         choices=ALERT_STATUS_CHOICES,
         default="ACTIVE"
     )
+
+    acknowledged = models.BooleanField(default=False)
+    sentAt = models.DateTimeField(null=True, blank=True)
 
     createdAt = models.DateTimeField(default=timezone.now)
 
@@ -320,13 +337,25 @@ class PaymentChannel(models.Model):
 # CUSTOMER NOTIFICATION
 # ─────────────────────────────────────────────
 
+NOTIFICATION_STATUS_CHOICES = [
+    ("PENDING", "PENDING"),
+    ("SENT", "SENT"),
+    ("FAILED", "FAILED"),
+    ("DELIVERED", "DELIVERED"),
+]
+
 class CustomerNotification(models.Model):
-    recipientId = models.CharField(max_length=255)
-    channel     = models.CharField(max_length=20, default='SMS')
-    message     = models.TextField()
-    language    = models.CharField(max_length=10, default='en')
-    status      = models.CharField(max_length=20, default='SENT')
-    createdAt   = models.DateTimeField(default=timezone.now)
+    recipientId      = models.CharField(max_length=255)
+    channel          = models.CharField(max_length=20, default='SMS')
+    message          = models.TextField()
+    language         = models.CharField(max_length=10, default='en')
+    status           = models.CharField(max_length=20, choices=NOTIFICATION_STATUS_CHOICES, default='SENT')
+    # Pipeline-linked fields
+    incidentDbId     = models.IntegerField(null=True, blank=True)
+    messageTemplateId= models.IntegerField(null=True, blank=True)
+    messageSent      = models.TextField(null=True, blank=True)
+    sentAt           = models.DateTimeField(null=True, blank=True)
+    createdAt        = models.DateTimeField(default=timezone.now)
 
 
 # ─────────────────────────────────────────────
@@ -334,10 +363,16 @@ class CustomerNotification(models.Model):
 # ─────────────────────────────────────────────
 
 class MessageTemplate(models.Model):
-    name     = models.CharField(max_length=100)
-    language = models.CharField(max_length=10, default='en')
-    body     = models.TextField()
-    createdAt= models.DateTimeField(default=timezone.now)
+    name            = models.CharField(max_length=100)
+    templateKey     = models.CharField(max_length=50, default='atm_offline')
+    language        = models.CharField(max_length=10, default='en')
+    channel         = models.CharField(max_length=20, default='SMS')
+    body            = models.TextField()
+    variablesSchema = models.JSONField(default=dict)
+    createdAt       = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ('templateKey', 'language', 'channel')
 
     def __str__(self):
-        return self.name
+        return f"{self.templateKey}/{self.language}/{self.channel}"

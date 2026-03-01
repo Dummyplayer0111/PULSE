@@ -133,10 +133,5 @@ CHANNEL_LAYERS = {
     },
 }
 
-# CORS — allow the Vite dev server
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3001',
-]
+# CORS — allow all origins in development
+CORS_ALLOW_ALL_ORIGINS = True
