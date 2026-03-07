@@ -21,8 +21,7 @@ const ADMIN_NAV = [
 ];
 
 const ENGINEER_NAV = [
-  { to: '/engineer',   label: 'My Incidents', Icon: Wrench        },
-  { to: '/incidents',  label: 'All Incidents', Icon: AlertTriangle },
+  { to: '/engineer', label: 'My Incidents', Icon: Wrench },
 ];
 
 function getInitialTheme(): 'dark' | 'light' {

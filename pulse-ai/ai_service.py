@@ -123,6 +123,84 @@ async def detect(data: dict = Body(...)):
         "explanation": f"Error rate is {round(z_score, 1)} standard deviations from baseline."
     }
 
+@app.post("/fraud")
+async def fraud_detect(data: dict = Body(...)):
+    """
+    Detects transaction-level fraud using three heuristics:
+    1. Rapid withdrawal  — 3+ transactions from the same card in a 10-min window
+    2. Amount anomaly    — Z-score vs card historical baseline > 3.5σ
+    3. Geographic anomaly — impossible travel: >100 km in <60 min
+    """
+    from math import radians, sin, cos, sqrt, atan2
+    from datetime import datetime
+
+    current  = data.get("current", {})
+    recent   = data.get("recentTransactions", [])
+    baseline = data.get("cardBaseline", {})
+
+    amount   = float(current.get("amount", 0))
+    curr_lat = current.get("latitude")
+    curr_lng = current.get("longitude")
+    curr_ts  = current.get("timestamp", "")
+
+    mean_amt = float(baseline.get("meanAmount", 2500))
+    std_amt  = float(baseline.get("stdAmount",  800))
+
+    fraud_type = None
+    confidence = 0.0
+    reasons    = []
+
+    # 1. Rapid withdrawal
+    if len(recent) >= 3:
+        fraud_type = "RAPID_WITHDRAWAL"
+        confidence = min(1.0, 0.55 + (len(recent) - 3) * 0.12)
+        reasons.append(f"{len(recent)} withdrawals in 10-minute window")
+
+    # 2. Amount anomaly (Z-score)
+    if std_amt > 0:
+        z = (amount - mean_amt) / std_amt
+        if abs(z) > 3.5:
+            amt_conf = min(1.0, round(abs(z) / 8, 2))
+            if amt_conf > confidence:
+                fraud_type = "UNUSUAL_WITHDRAWAL"
+                confidence = amt_conf
+            reasons.append(f"Amount {int(amount)} is {abs(z):.1f} std devs from card mean {int(mean_amt)}")
+
+    # 3. Geographic anomaly — impossible travel
+    if recent and curr_lat and curr_lng and curr_ts:
+        last     = recent[0]
+        last_lat = last.get("latitude")
+        last_lng = last.get("longitude")
+        last_ts  = last.get("timestamp", "")
+        if last_lat and last_lng and last_ts:
+            R    = 6371
+            dlat = radians(curr_lat - last_lat)
+            dlng = radians(curr_lng - last_lng)
+            a    = sin(dlat / 2) ** 2 + cos(radians(last_lat)) * cos(radians(curr_lat)) * sin(dlng / 2) ** 2
+            dist_km = 2 * R * atan2(sqrt(a), sqrt(1 - a))
+            try:
+                t1   = datetime.fromisoformat(last_ts.replace("Z", "+00:00"))
+                t2   = datetime.fromisoformat(curr_ts.replace("Z", "+00:00"))
+                mins = abs((t2 - t1).total_seconds() / 60) or 1
+                if dist_km > 100 and mins < 60:
+                    geo_conf = min(1.0, round(dist_km / 500, 2))
+                    if geo_conf > confidence:
+                        fraud_type = "GEOGRAPHIC_ANOMALY"
+                        confidence = geo_conf
+                    reasons.append(f"Card used {int(dist_km)} km apart in {int(mins)} min")
+            except Exception:
+                pass
+
+    is_fraud = fraud_type is not None and confidence >= 0.5
+
+    return {
+        "isFraud":     is_fraud,
+        "fraudType":   fraud_type if is_fraud else None,
+        "confidence":  round(confidence, 2),
+        "explanation": "; ".join(reasons) if reasons else "Transaction within normal parameters.",
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)

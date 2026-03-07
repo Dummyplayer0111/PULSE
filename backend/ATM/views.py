@@ -16,11 +16,93 @@ from rest_framework.response import Response
 from .models import (
     ATM, Alert, AnomalyFlag, CustomerNotification, HealthSnapshot,
     Incident, LogEntry, MessageTemplate, PaymentChannel, SelfHealAction,
-    UserProfile,
+    Transaction, UserProfile,
 )
-from .pipeline import _broadcast_atm, process_log
+from .pipeline import _auto_assign_engineer, _broadcast_atm, process_log
 
 channel_layer = get_channel_layer()
+
+
+# ─────────────────────────────────────────────
+# FRAUD CHECK HELPER
+# ─────────────────────────────────────────────
+
+def _run_fraud_check(txn):
+    """
+    Call AI /fraud endpoint for a Transaction.
+    Creates an AnomalyFlag and marks the transaction FLAGGED if fraud detected.
+    Safe to run in a background thread.
+    """
+    from datetime import timedelta
+    import requests as http_requests
+
+    ai_url = os.environ.get("AI_SERVICE_URL", "http://localhost:8001")
+    ten_min_ago = timezone.now() - timedelta(minutes=10)
+
+    recent = list(
+        Transaction.objects.filter(
+            cardHash=txn.cardHash,
+            timestamp__gte=ten_min_ago,
+        ).exclude(id=txn.id).order_by('-timestamp')[:10].values(
+            'amount', 'latitude', 'longitude', 'timestamp'
+        )
+    )
+    for t in recent:
+        if t['timestamp']:
+            t['timestamp'] = t['timestamp'].isoformat()
+
+    amounts = list(
+        Transaction.objects.filter(cardHash=txn.cardHash)
+        .exclude(id=txn.id).values_list('amount', flat=True)[:100]
+    )
+    if amounts:
+        mean_amt = sum(amounts) / len(amounts)
+        var      = sum((x - mean_amt) ** 2 for x in amounts) / max(len(amounts) - 1, 1)
+        std_amt  = var ** 0.5 if var > 0 else 500.0
+    else:
+        mean_amt = 2500.0
+        std_amt  = 800.0
+
+    try:
+        resp = http_requests.post(
+            f"{ai_url}/fraud",
+            json={
+                "current": {
+                    "amount":    txn.amount,
+                    "latitude":  txn.latitude,
+                    "longitude": txn.longitude,
+                    "timestamp": txn.timestamp.isoformat(),
+                },
+                "recentTransactions": recent,
+                "cardBaseline": {"meanAmount": mean_amt, "stdAmount": std_amt},
+            },
+            timeout=5,
+        )
+        result = resp.json()
+    except Exception:
+        return None
+
+    if not result.get("isFraud"):
+        return result
+
+    fraud_map = {
+        "RAPID_WITHDRAWAL":   "UNUSUAL_WITHDRAWAL",
+        "UNUSUAL_WITHDRAWAL": "UNUSUAL_WITHDRAWAL",
+        "GEOGRAPHIC_ANOMALY": "CARD_SKIMMING",
+    }
+    anomaly_type = fraud_map.get(result.get("fraudType", ""), "UNUSUAL_WITHDRAWAL")
+    source_id    = uuid.UUID(int=txn.atm_id) if txn.atm_id else uuid.UUID(int=0)
+
+    flag = AnomalyFlag.objects.create(
+        sourceId=source_id,
+        sourceType='ATM',
+        anomalyType=anomaly_type,
+        confidenceScore=min(1.0, result.get("confidence", 0.7)),
+        description=result.get("explanation", "Transaction fraud detected."),
+        status='FLAGGED',
+    )
+    Transaction.objects.filter(id=txn.id).update(status='FLAGGED', anomalyFlagId=flag.id)
+    return result
 
 
 # ─────────────────────────────────────────────
@@ -83,6 +165,28 @@ _SIM_EVENTS = [
 ]
 _SIM_TOTAL_WEIGHT = sum(e["weight"] for e in _SIM_EVENTS)
 
+_SIM_CARD_POOL = [
+    hashlib.sha256(f"CARD-{i}".encode()).hexdigest()[:16] for i in range(200)
+]
+
+
+def _sim_generate_transaction(atm):
+    """Generate a synthetic ATM transaction and run fraud detection in a background thread."""
+    card_hash    = random.choice(_SIM_CARD_POOL)
+    is_fraud_amt = random.random() < 0.05
+    amount       = float(round(random.uniform(30000, 50000))) if is_fraud_amt else float(round(random.uniform(500, 5000)))
+    txn = Transaction.objects.create(
+        atm=atm,
+        cardHash=card_hash,
+        amount=amount,
+        transactionType='WITHDRAWAL',
+        latitude=atm.latitude,
+        longitude=atm.longitude,
+        status='COMPLETED',
+        timestamp=timezone.now(),
+    )
+    threading.Thread(target=_run_fraud_check, args=(txn,), daemon=True).start()
+
 
 def _sim_pick_event():
     r = random.uniform(0, _SIM_TOTAL_WEIGHT)
@@ -131,6 +235,10 @@ def _sim_run():
 
             # Run the full pipeline (we're already in a background thread)
             process_log(log_entry.id)
+
+            # Also generate a transaction for this ATM (~60% of events)
+            if random.random() < 0.6:
+                _sim_generate_transaction(atm)
 
             # Update sim stats from DB
             with _sim_lock:
@@ -779,6 +887,79 @@ def update_anomaly_flag(request, id):
     return Response({"updated": id, "status": flag.status})
 
 
+@api_view(['POST'])
+def confirm_anomaly_flag(request, id):
+    """
+    Confirm an anomaly flag as a real threat.
+    Marks the flag REVIEWED and opens a linked Incident.
+    """
+    try:
+        flag = AnomalyFlag.objects.get(id=id)
+    except AnomalyFlag.DoesNotExist:
+        return Response({"error": "Not found"}, status=404)
+
+    flag.status = 'REVIEWED'
+    flag.save(update_fields=['status'])
+
+    # Map anomaly type → root cause category
+    category_map = {
+        'UNUSUAL_WITHDRAWAL': 'FRAUD',
+        'CARD_SKIMMING':      'FRAUD',
+        'MALWARE_PATTERN':    'FRAUD',
+        'RAPID_FAILURES':     'UNKNOWN',
+    }
+    category = category_map.get(flag.anomalyType, 'FRAUD')
+
+    # Severity from confidence score
+    c = flag.confidenceScore or 0
+    if c >= 0.85:
+        severity = 'CRITICAL'
+    elif c >= 0.70:
+        severity = 'HIGH'
+    elif c >= 0.50:
+        severity = 'MEDIUM'
+    else:
+        severity = 'LOW'
+
+    # ATM name for title
+    atm_name = f'ATM-{str(flag.sourceId.int)[:6]}'
+    try:
+        atm_obj = ATM.objects.get(id=flag.sourceId.int)
+        atm_name = atm_obj.name
+    except Exception:
+        pass
+
+    incident_number = f'INC-{uuid.uuid4().hex[:8].upper()}'
+    incident = Incident.objects.create(
+        incidentId=incident_number,
+        title=f'{flag.anomalyType.replace("_", " ").title()} confirmed at {atm_name}',
+        severity=severity,
+        status='OPEN',
+        sourceId=flag.sourceId,
+        sourceType=flag.sourceType,
+        rootCauseCategory=category,
+        rootCauseDetail=flag.description or f'{flag.anomalyType} anomaly confirmed by operator.',
+        aiConfidence=flag.confidenceScore or 0,
+        triggeringLogId=uuid.UUID(int=flag.logEntryId) if flag.logEntryId else uuid.UUID(int=0),
+        contributingLogIds=flag.contributingLogIds or [],
+    )
+
+    _auto_assign_engineer(incident)
+
+    return Response({
+        "confirmed": True,
+        "flagId":    id,
+        "incident": {
+            "id":         incident.id,
+            "incidentId": incident.incidentId,
+            "title":      incident.title,
+            "severity":   incident.severity,
+            "status":     incident.status,
+            "assignedTo": incident.assignedTo,
+        },
+    })
+
+
 # ─────────────────────────────────────────────
 # NOTIFICATIONS
 # ─────────────────────────────────────────────
@@ -919,3 +1100,85 @@ def ai_failure_trend(request):
         })
 
     return Response({'trend': trend})
+
+
+# ─────────────────────────────────────────────
+# TRANSACTIONS
+# ─────────────────────────────────────────────
+
+@api_view(['GET'])
+def transaction_list(request):
+    """
+    Returns recent transactions enriched with fraud flag data.
+    ?flagged=true  — only FLAGGED/BLOCKED transactions
+    ?limit=N       — max rows (default 100, max 500)
+    """
+    qs          = Transaction.objects.all().order_by('-timestamp')
+    flagged_only = request.query_params.get('flagged') == 'true'
+    limit        = min(int(request.query_params.get('limit', 100)), 500)
+
+    if flagged_only:
+        qs = qs.filter(status__in=['FLAGGED', 'BLOCKED'])
+
+    txns = list(qs[:limit].values(
+        'id', 'cardHash', 'amount', 'transactionType',
+        'latitude', 'longitude', 'status', 'anomalyFlagId',
+        'timestamp', 'createdAt', 'atm_id', 'atm__name', 'atm__location',
+    ))
+
+    flag_ids  = [t['anomalyFlagId'] for t in txns if t['anomalyFlagId']]
+    flags_map = {}
+    if flag_ids:
+        for f in AnomalyFlag.objects.filter(id__in=flag_ids).values(
+            'id', 'anomalyType', 'confidenceScore', 'description'
+        ):
+            flags_map[f['id']] = f
+
+    for t in txns:
+        flag = flags_map.get(t['anomalyFlagId'])
+        t['fraudType']        = flag['anomalyType']     if flag else None
+        t['fraudConfidence']  = flag['confidenceScore'] if flag else None
+        t['fraudDescription'] = flag['description']     if flag else None
+
+    return Response(txns)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def transaction_ingest(request):
+    """
+    Ingest a single transaction and run fraud detection asynchronously.
+    Body: { atmId, cardHash, amount, transactionType, latitude, longitude }
+    """
+    data      = request.data
+    atm_id    = data.get('atmId')
+    card_hash = data.get('cardHash') or hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()[:16]
+    amount    = float(data.get('amount', 0))
+    txn_type  = data.get('transactionType', 'WITHDRAWAL')
+    lat       = data.get('latitude')
+    lng       = data.get('longitude')
+
+    atm = None
+    if atm_id:
+        try:
+            atm = ATM.objects.get(id=atm_id)
+        except ATM.DoesNotExist:
+            pass
+
+    txn = Transaction.objects.create(
+        atm=atm,
+        cardHash=card_hash,
+        amount=amount,
+        transactionType=txn_type,
+        latitude=lat or (atm.latitude if atm else None),
+        longitude=lng or (atm.longitude if atm else None),
+        status='COMPLETED',
+        timestamp=timezone.now(),
+    )
+    threading.Thread(target=_run_fraud_check, args=(txn,), daemon=True).start()
+
+    return Response({
+        'transactionId': txn.id,
+        'status':        txn.status,
+        'message':       'Transaction recorded. Fraud detection running.',
+    })

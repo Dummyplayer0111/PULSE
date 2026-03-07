@@ -44,7 +44,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const pulseApi = createApi({
   reducerPath: 'pulseApi',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['Incidents', 'Logs', 'Anomalies', 'SelfHealActions', 'Notifications', 'Templates', 'ATMs'],
+  tagTypes: ['Incidents', 'Logs', 'Anomalies', 'SelfHealActions', 'Notifications', 'Templates', 'ATMs', 'Transactions'],
   endpoints: (builder) => ({
 
     // ── AUTH ──────────────────────────────────────────────────
@@ -147,12 +147,32 @@ export const pulseApi = createApi({
       query: ({ id, body }) => ({ url: `anomaly/flags/${id}/`, method: 'PATCH', body }),
       invalidatesTags: ['Anomalies'],
     }),
+    confirmAnomalyFlag: builder.mutation<any, string | number>({
+      query: (id) => ({ url: `anomaly/flags/${id}/confirm/`, method: 'POST' }),
+      invalidatesTags: ['Anomalies', 'Incidents'],
+    }),
 
     // ── SIMULATOR ─────────────────────────────────────────────
     startSimulator:     builder.mutation<any, void>({ query: () => ({ url: 'simulator/start/',  method: 'POST' }) }),
     stopSimulator:      builder.mutation<any, void>({ query: () => ({ url: 'simulator/stop/',   method: 'POST' }) }),
     getSimulatorStatus: builder.query<any, void>({   query: () => 'simulator/status/' }),
     resetAtmHealth:     builder.mutation<any, number>({ query: (id) => ({ url: `atms/${id}/reset-health/`, method: 'POST' }), invalidatesTags: ['ATMs'] }),
+
+    // ── TRANSACTIONS ──────────────────────────────────────────
+    getTransactions: builder.query<any[], { flagged?: boolean; limit?: number } | void>({
+      query: (params) => {
+        const p = new URLSearchParams();
+        if (params?.flagged) p.set('flagged', 'true');
+        if (params?.limit)   p.set('limit', String(params.limit));
+        const qs = p.toString();
+        return qs ? `transactions/?${qs}` : 'transactions/';
+      },
+      providesTags: ['Transactions'],
+    }),
+    ingestTransaction: builder.mutation<any, object>({
+      query: (body) => ({ url: 'transactions/ingest/', method: 'POST', body }),
+      invalidatesTags: ['Transactions', 'Anomalies'],
+    }),
 
     // ── NOTIFICATIONS ─────────────────────────────────────────
     getNotifications: builder.query<any[], void>({
@@ -205,10 +225,13 @@ export const {
   useTriggerSelfHealMutation,
   useGetAnomalyFlagsQuery,
   useUpdateAnomalyFlagMutation,
+  useConfirmAnomalyFlagMutation,
   useStartSimulatorMutation,
   useStopSimulatorMutation,
   useGetSimulatorStatusQuery,
   useResetAtmHealthMutation,
+  useGetTransactionsQuery,
+  useIngestTransactionMutation,
   useGetNotificationsQuery,
   useSendNotificationMutation,
   useGetTemplatesQuery,

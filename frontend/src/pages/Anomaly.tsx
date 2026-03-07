@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, TrendingUp, MapPin } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, TrendingUp, MapPin, CreditCard, Shield } from 'lucide-react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
-import { useGetAnomalyFlagsQuery, useUpdateAnomalyFlagMutation, useGetATMsQuery } from '../services/pulseApi';
+import { useGetAnomalyFlagsQuery, useUpdateAnomalyFlagMutation, useConfirmAnomalyFlagMutation, useGetATMsQuery, useGetTransactionsQuery } from '../services/pulseApi';
 import Modal from '../components/common/Modal';
 import { formatDate, shortId } from '../utils';
 
@@ -273,9 +273,145 @@ function FraudHeatmap({ flags }: { flags: any[] }) {
   );
 }
 
+/* ── Transaction Fraud Section ───────────────────────────────────────── */
+function TransactionFraudSection() {
+  const { data: txns = [], isLoading } = useGetTransactionsQuery(
+    { flagged: true, limit: 50 },
+    { pollingInterval: 5000 },
+  );
+
+  const uniqueCards  = new Set((txns as any[]).map((t: any) => t.cardHash)).size;
+  const totalBlocked = (txns as any[]).reduce((s: number, t: any) => s + (t.amount || 0), 0);
+
+  return (
+    <div className="space-y-3">
+      {/* Section header + stats */}
+      <div className="flex items-center gap-3 flex-wrap pt-1">
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center"
+          style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}
+        >
+          <CreditCard size={14} style={{ color: '#ef4444' }} />
+        </div>
+        <div>
+          <h2 className="text-base font-bold text-white">Transaction Fraud Monitoring</h2>
+          <p className="text-xs" style={{ color: 'var(--p-heading-dim)' }}>
+            Behavioral analysis · Z-score + rapid-withdrawal + geographic detection
+          </p>
+        </div>
+        <div className="ml-auto flex items-center gap-3 flex-wrap">
+          {[
+            { label: 'Flagged Txns',   value: txns.length,                              color: '#ef4444' },
+            { label: 'Cards at Risk',  value: uniqueCards,                              color: '#f97316' },
+            { label: 'Amount at Risk', value: `₹${(totalBlocked / 1000).toFixed(0)}K`, color: '#a78bfa' },
+          ].map(({ label, value, color }) => (
+            <div
+              key={label}
+              className="flex flex-col items-center px-3 py-1.5 rounded-xl"
+              style={{ background: 'var(--p-card)', border: `1px solid ${color}40` }}
+            >
+              <span className="text-base font-bold" style={{ color }}>{value}</span>
+              <span className="text-[9px]" style={{ color: 'var(--p-text-dim)' }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div
+        className="rounded-2xl overflow-hidden"
+        style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
+      >
+        {isLoading ? (
+          <div className="p-8 text-center text-sm" style={{ color: 'var(--p-text-muted)' }}>Loading…</div>
+        ) : (txns as any[]).length === 0 ? (
+          <div className="p-10 text-center">
+            <Shield size={28} style={{ color: 'rgba(255,255,255,0.1)', margin: '0 auto 10px' }} />
+            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No fraudulent transactions detected.</p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                {['Time', 'ATM', 'Card', 'Amount', 'Fraud Type', 'Confidence', 'Status'].map(h => (
+                  <th
+                    key={h}
+                    className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ color: 'rgba(255,255,255,0.28)' }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(txns as any[]).slice(0, 20).map((t: any) => {
+                const confidence = t.fraudConfidence ?? 0;
+                const threat     = getThreatLevel(confidence);
+                const typeColor  = ANOMALY_TYPE_COLORS[t.fraudType] ?? '#f59e0b';
+                const typeIcon   = ANOMALY_TYPE_ICONS[t.fraudType]  ?? '⚠️';
+                return (
+                  <tr
+                    key={t.id}
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--p-card-hover)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
+                  >
+                    <td className="px-5 py-3 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                      {formatDate(t.timestamp)}
+                    </td>
+                    <td className="px-5 py-3">
+                      <p className="text-xs font-medium text-white">{t.atm__name ?? `ATM-${t.atm_id ?? '?'}`}</p>
+                      <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{t.atm__location ?? '—'}</p>
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className="text-xs font-mono" style={{ color: 'var(--p-text-dim)' }}>
+                        ****{(t.cardHash ?? '????').slice(-4)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className="text-sm font-bold" style={{ color: '#f59e0b' }}>
+                        ₹{Number(t.amount).toLocaleString('en-IN')}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-base">{typeIcon}</span>
+                        <span
+                          className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
+                          style={{ color: typeColor, background: `${typeColor}15` }}
+                        >
+                          {(t.fraudType ?? '—').replace('_', ' ')}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <ThreatLevelMeter confidence={confidence} />
+                    </td>
+                    <td className="px-5 py-3">
+                      <span
+                        className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
+                        style={{ color: threat.color, background: `${threat.color}18` }}
+                      >
+                        {t.status}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 export default function Anomaly() {
   const { data: flags = [], isLoading } = useGetAnomalyFlagsQuery(undefined, { pollingInterval: 5000 });
-  const [updateFlag, { isLoading: updating }] = useUpdateAnomalyFlagMutation();
+  const [updateFlag,  { isLoading: updating }]   = useUpdateAnomalyFlagMutation();
+  const [confirmFlag, { isLoading: confirming }] = useConfirmAnomalyFlagMutation();
 
   const [staFilter,  setStaFilter]  = useState('All');
   const [editId,     setEditId]     = useState<any>(null);
@@ -350,6 +486,16 @@ export default function Anomaly() {
 
       {/* Fraud Pattern Heatmap */}
       <FraudHeatmap flags={flags as any[]} />
+
+      {/* Transaction Fraud Monitoring */}
+      <TransactionFraudSection />
+
+      {/* Divider */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '4px' }}>
+        <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'rgba(255,255,255,0.25)' }}>
+          Infrastructure Anomaly Flags
+        </p>
+      </div>
 
       {/* Status filter pills */}
       <div className="flex flex-wrap items-center gap-2">
@@ -446,9 +592,10 @@ export default function Anomaly() {
                         {isActive && (
                           <>
                             <button
-                              onClick={() => quickAction(flag.id, 'REVIEWED')}
-                              title="Confirm threat"
-                              className="p-1.5 rounded-lg transition-all"
+                              onClick={() => confirmFlag(flag.id)}
+                              disabled={confirming}
+                              title="Confirm threat — opens incident"
+                              className="p-1.5 rounded-lg transition-all disabled:opacity-40"
                               style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}
                               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.2)')}
                               onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
@@ -520,11 +667,12 @@ export default function Anomaly() {
           {/* Quick action buttons */}
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => handleUpdate('REVIEWED')}
-              className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all"
+              onClick={async () => { await confirmFlag(editId); setEditId(null); setNotes(''); }}
+              disabled={confirming}
+              className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-40"
               style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}
             >
-              <AlertTriangle size={11} /> Confirm Threat
+              <AlertTriangle size={11} /> {confirming ? 'Opening…' : 'Confirm Threat'}
             </button>
             <button
               onClick={() => handleUpdate('FALSE_POSITIVE')}

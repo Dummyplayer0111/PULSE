@@ -335,6 +335,40 @@ class PaymentChannel(models.Model):
 
 
 # ─────────────────────────────────────────────
+# TRANSACTION
+# ─────────────────────────────────────────────
+
+TRANSACTION_TYPE_CHOICES = [
+    ("WITHDRAWAL",    "WITHDRAWAL"),
+    ("BALANCE_CHECK", "BALANCE_CHECK"),
+    ("DEPOSIT",       "DEPOSIT"),
+]
+
+TRANSACTION_STATUS_CHOICES = [
+    ("COMPLETED", "COMPLETED"),
+    ("BLOCKED",   "BLOCKED"),
+    ("FLAGGED",   "FLAGGED"),
+    ("FAILED",    "FAILED"),
+]
+
+
+class Transaction(models.Model):
+    atm             = models.ForeignKey('ATM', on_delete=models.SET_NULL, null=True, related_name='atm_transactions')
+    cardHash        = models.CharField(max_length=64)
+    amount          = models.FloatField()
+    transactionType = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES, default='WITHDRAWAL')
+    latitude        = models.FloatField(null=True, blank=True)
+    longitude       = models.FloatField(null=True, blank=True)
+    status          = models.CharField(max_length=20, choices=TRANSACTION_STATUS_CHOICES, default='COMPLETED')
+    anomalyFlagId   = models.IntegerField(null=True, blank=True)
+    timestamp       = models.DateTimeField(default=timezone.now)
+    createdAt       = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.cardHash[:8]}… ₹{self.amount}"
+
+
+# ─────────────────────────────────────────────
 # CUSTOMER NOTIFICATION
 # ─────────────────────────────────────────────
 

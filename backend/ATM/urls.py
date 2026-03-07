@@ -41,8 +41,9 @@ urlpatterns = [
     path('self-heal/trigger/',  views.self_heal_trigger),
 
     # ANOMALY
-    path('anomaly/flags/',          views.anomaly_flags),
-    path('anomaly/flags/<int:id>/', views.update_anomaly_flag),
+    path('anomaly/flags/',                    views.anomaly_flags),
+    path('anomaly/flags/<int:id>/',           views.update_anomaly_flag),
+    path('anomaly/flags/<int:id>/confirm/',   views.confirm_anomaly_flag),
 
     # NOTIFICATIONS
     path('notifications/',            views.notification_list),
@@ -56,6 +57,10 @@ urlpatterns = [
 
     # PIPELINE FEED (REST fallback for live feed)
     path('pipeline/events/',   views.recent_pipeline_events),
+
+    # TRANSACTIONS
+    path('transactions/',        views.transaction_list),
+    path('transactions/ingest/', views.transaction_ingest),
 
     # USERS
     path('users/engineers/',   views.list_engineers),
