@@ -483,23 +483,33 @@ export default function ATMDetail() {
           >
             {/* Health score ring */}
             <div className="flex flex-col items-center gap-2">
-              <div
-                className="w-20 h-20 rounded-full flex items-center justify-center"
-                style={{
-                  background: `conic-gradient(${
-                    (atm?.healthScore ?? 0) >= 80 ? '#4ade80' :
-                    (atm?.healthScore ?? 0) >= 60 ? '#f59e0b' : '#ef4444'
-                  } ${(atm?.healthScore ?? 0) * 3.6}deg, rgba(255,255,255,0.06) 0deg)`,
-                  border: '1px solid var(--p-card-border)',
-                }}
-              >
-                <div
-                  className="w-14 h-14 rounded-full flex items-center justify-center"
-                  style={{ background: 'var(--p-gauge-inner)' }}
-                >
-                  <span className="text-base font-bold text-white">{atm?.healthScore ?? '—'}</span>
-                </div>
-              </div>
+              {(() => {
+                const score = atm?.healthScore ?? 0;
+                const color = score >= 80 ? '#4ade80' : score >= 60 ? '#f59e0b' : '#ef4444';
+                const size = 80;
+                const sw = 7;
+                const r = (size - sw) / 2;
+                const circ = 2 * Math.PI * r;
+                const dash = (score / 100) * circ;
+                return (
+                  <div style={{ position: 'relative', width: size, height: size }}>
+                    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+                      {/* Track */}
+                      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={sw} />
+                      {/* Arc */}
+                      <circle
+                        cx={size/2} cy={size/2} r={r} fill="none"
+                        stroke={color} strokeWidth={sw} strokeLinecap="round"
+                        strokeDasharray={`${dash} ${circ}`}
+                        style={{ transition: 'stroke-dasharray 0.6s ease, stroke 0.4s ease', filter: `drop-shadow(0 0 4px ${color}88)` }}
+                      />
+                    </svg>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '1rem', fontWeight: 700, color: '#fff' }}>{score}</span>
+                    </div>
+                  </div>
+                );
+              })()}
               <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Health Score</span>
             </div>
 
