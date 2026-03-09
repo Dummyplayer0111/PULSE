@@ -484,6 +484,16 @@ class Command(BaseCommand):
 
         # ── 4. Seed open Incidents for YELLOW / RED ───────────────────────────
         self.stdout.write("\n── Seeding open Incidents ──")
+
+        # Find engineers to round-robin assign incidents to
+        from django.contrib.auth.models import User
+        engineers = list(
+            User.objects.filter(profile__role='ENGINEER').values_list('username', flat=True)
+        )
+        if not engineers:
+            engineers = ['engineer1']   # fallback if seed_engineer hasn't run
+        eng_cycle = 0
+
         ROOT_CAUSE_FOR_COMPONENT = {
             "network":     ("NETWORK",  "NETWORK_TIMEOUT",   "HIGH"),
             "hardware":    ("HARDWARE", "HARDWARE_JAM",      "HIGH"),
@@ -504,6 +514,8 @@ class Command(BaseCommand):
             for i in range(n_incidents):
                 inc_id = f"INC-{uuid.uuid4().hex[:8].upper()}"
                 created_at = now - timedelta(hours=random.randint(1, 48))
+                assigned = engineers[eng_cycle % len(engineers)]
+                eng_cycle += 1
                 Incident.objects.create(
                     incidentId=inc_id,
                     title=f"{root_cause} failure at {atm.name}",
@@ -519,10 +531,11 @@ class Command(BaseCommand):
                     aiConfidence=round(random.uniform(0.82, 0.97), 2),
                     triggeringLogId=uuid.UUID(int=random.randint(1, 999999)),
                     contributingLogIds=[],
+                    assignedTo=assigned,
                     createdAt=created_at,
                 )
 
-            self.stdout.write(f"  {atm.name}: {n_incidents} incident(s) seeded")
+            self.stdout.write(f"  {atm.name}: {n_incidents} incident(s) → {assigned}")
 
         # ── Summary ───────────────────────────────────────────────────────────
         self.stdout.write("\n" + "=" * 52)
