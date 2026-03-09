@@ -409,6 +409,12 @@ function LandingPage() {
         @keyframes bgf2         { 0%,100%{transform:translateY(-10px)} 50%{transform:translateY(12px)} }
         @keyframes bgf3         { 0%,100%{transform:translateY(5px)} 50%{transform:translateY(-15px)} }
         @keyframes bgrot        { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes sd1 { 0%{transform:translate(0,0) rotate(0deg)} 100%{transform:translate(320px,260px) rotate(24deg)} }
+        @keyframes sd2 { 0%{transform:translate(0,0) rotate(0deg)} 100%{transform:translate(-280px,300px) rotate(-20deg)} }
+        @keyframes sd3 { 0%{transform:translate(0,0) rotate(0deg)} 100%{transform:translate(260px,-300px) rotate(30deg)} }
+        @keyframes sd4 { 0%{transform:translate(0,0) rotate(0deg)} 100%{transform:translate(-300px,-240px) rotate(-26deg)} }
+        @keyframes sd5 { 0%{transform:translate(0,0) rotate(0deg)} 100%{transform:translate(340px,200px) rotate(18deg)} }
+        @keyframes sd6 { 0%{transform:translate(0,0) rotate(0deg)} 100%{transform:translate(220px,-320px) rotate(-22deg)} }
         @keyframes cardshine    { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
         @keyframes liquidFlow   { 0%{background-position:-300% 0} 100%{background-position:300% 0} }
         @keyframes glassShimmer { 0%,100%{opacity:0} 50%{opacity:1} }
@@ -428,6 +434,12 @@ function LandingPage() {
         .bgf2         { animation: bgf2         12s ease-in-out infinite 2s; }
         .bgf3         { animation: bgf3         15s ease-in-out infinite 4s; }
         .bgspin       { animation: bgrot        50s linear infinite; }
+        .sd1 { animation: sd1 32s linear infinite; }
+        .sd2 { animation: sd2 40s linear infinite 6s; }
+        .sd3 { animation: sd3 27s linear infinite 12s; }
+        .sd4 { animation: sd4 36s linear infinite 3s; }
+        .sd5 { animation: sd5 44s linear infinite 18s; }
+        .sd6 { animation: sd6 30s linear infinite 9s; }
         .shine        { background: linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.06) 50%, transparent 80%);
                         background-size: 200% 100%; animation: cardshine 2.8s cubic-bezier(0.4,0,0.2,1) infinite; }
         .liquid-shine { background: linear-gradient(105deg, transparent 15%, rgba(255,255,255,0.09) 45%, rgba(255,255,255,0.04) 55%, transparent 85%);
@@ -444,23 +456,15 @@ function LandingPage() {
       <section id="hero" className="relative min-h-screen flex items-center overflow-hidden" style={{ paddingTop: 'clamp(80px,7vw,100px)', background: '#000' }}>
 
 
-        {/* Large ambient glow orbs */}
-        <div className="absolute pointer-events-none" style={{ top: '5%',  left: '5%',  width: 440, height: 440, background: 'radial-gradient(circle,rgba(196,151,70,0.07) 0%,rgba(83,53,23,0.04) 50%,transparent 70%)', filter: 'blur(80px)' }} />
-        <div className="absolute pointer-events-none" style={{ bottom: '5%', right: '8%', width: 375, height: 375, background: 'radial-gradient(circle,rgba(196,151,70,0.055) 0%,rgba(83,53,23,0.03) 50%,transparent 70%)', filter: 'blur(70px)' }} />
-        <div className="absolute pointer-events-none" style={{ top: '40%', left: '38%', width: 250, height: 250, background: 'radial-gradient(circle,rgba(232,175,72,0.04) 0%,transparent 70%)', filter: 'blur(60px)' }} />
 
-        {/* Fintech floating background icons */}
-        {BG_ICONS.map(([type, lft, top, size, rot, op], i) => {
-          const floatClass = i % 3 === 0 ? 'bgf1' : i % 3 === 1 ? 'bgf2' : 'bgf3';
-          const isSpinner  = type === 'globe' || type === 'db';
-          return (
-            <div key={i} className="absolute pointer-events-none" style={{ left: `${lft}%`, top: `${top}%` }}>
-              <div className={isSpinner ? 'bgspin' : floatClass}>
-                <FintechBgSVG type={type} size={size} rotate={rot} opacity={op} />
-              </div>
+        {/* Fintech space-drift background icons */}
+        {BG_ICONS.map(([type, lft, top, size, rot, op], i) => (
+          <div key={i} className="absolute pointer-events-none" style={{ left: `${lft}%`, top: `${top}%` }}>
+            <div className={`sd${(i % 6) + 1}`}>
+              <FintechBgSVG type={type} size={size} rotate={rot} opacity={op} />
             </div>
-          );
-        })}
+          </div>
+        ))}
 
         <div className="relative max-w-screen-xl mx-auto w-full px-8 md:px-14 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-14 items-center py-10">
           {/* Left */}
