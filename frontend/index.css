@@ -2,66 +2,96 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
-/* ── CSS Theme Tokens ─────────────────────────────────────────────────── */
+/* ── CSS Theme Tokens — Black + Warm Gold + White ─────────────────────── */
 :root {
-  --p-page: #0b0b0f;
-  /* sidebar — opaque black glass, no blue bleed */
-  --p-sidebar: rgba(10,10,13,0.96);
-  --p-sidebar-border: rgba(255,255,255,0.08);
-  --p-sidebar-label: rgba(255,255,255,0.22);
-  --p-nav-inactive: rgba(255,255,255,0.38);
-  --p-nav-active-bg: rgba(255,255,255,0.10);
-  --p-nav-active-bg2: rgba(255,255,255,0.05);
-  --p-nav-active-bdr: rgba(255,255,255,0.14);
-  --p-card: rgba(255,255,255,0.04);
-  --p-card-strong: rgba(255,255,255,0.07);
-  --p-card-border: rgba(255,255,255,0.08);
-  --p-card-hover: rgba(255,255,255,0.025);
+  /* page */
+  --p-page: #060606;
+
+  /* sidebar — deep black, warm gold glass */
+  --p-sidebar: rgba(7,6,4,0.97);
+  --p-sidebar-border: rgba(196,151,70,0.15);
+  --p-sidebar-label: rgba(196,151,70,0.42);
+  --p-sidebar-text: #feeaa5;
+
+  /* nav */
+  --p-nav-inactive: rgba(220,185,130,0.48);
+  --p-nav-active-bg: rgba(196,151,70,0.14);
+  --p-nav-active-bg2: rgba(196,151,70,0.07);
+  --p-nav-active-bdr: rgba(196,151,70,0.28);
+
+  /* cards — liquid gold glass */
+  --p-card: rgba(196,151,70,0.045);
+  --p-card-strong: rgba(196,151,70,0.08);
+  --p-card-border: rgba(196,151,70,0.13);
+  --p-card-hover: rgba(196,151,70,0.07);
+
+  /* text */
   --p-text: #ffffff;
-  --p-text-dim: rgba(255,255,255,0.45);
-  --p-text-muted: rgba(255,255,255,0.22);
-  --p-user-pill: rgba(255,255,255,0.05);
-  --p-user-pill-border: rgba(255,255,255,0.08);
-  --p-logo-bg1: rgba(255,255,255,0.13);
-  --p-logo-bg2: rgba(255,255,255,0.05);
-  --p-logo-border: rgba(255,255,255,0.14);
-  --p-toggle-bg: rgba(255,255,255,0.08);
-  --p-toggle-border: rgba(255,255,255,0.13);
-  --p-sidebar-text: #ffffff;
+  --p-text-dim: rgba(220,190,145,0.62);
+  --p-text-muted: rgba(196,151,70,0.42);
+
+  /* user pill */
+  --p-user-pill: rgba(196,151,70,0.07);
+  --p-user-pill-border: rgba(196,151,70,0.16);
+
+  /* logo / icon box */
+  --p-logo-bg1: rgba(196,151,70,0.22);
+  --p-logo-bg2: rgba(196,151,70,0.09);
+  --p-logo-border: rgba(196,151,70,0.26);
+
+  /* toggle */
+  --p-toggle-bg: rgba(196,151,70,0.09);
+  --p-toggle-border: rgba(196,151,70,0.18);
+
+  /* headings */
   --p-heading: #ffffff;
-  --p-heading-dim: rgba(255,255,255,0.5);
-  --p-heading-muted: rgba(255,255,255,0.28);
-  --p-gauge-inner: #0b0b0f;
+  --p-heading-dim: rgba(254,234,165,0.68);
+  --p-heading-muted: rgba(196,151,70,0.48);
+
+  /* gauge */
+  --p-gauge-inner: #060606;
+
+  /* gold accent tokens (used by pages for specular / glow) */
+  --p-gold: #e8af48;
+  --p-gold-dim: rgba(196,151,70,0.55);
+  --p-gold-muted: rgba(196,151,70,0.18);
+  --p-gold-border: rgba(196,151,70,0.13);
+  --p-specular: rgba(196,151,70,0.10);
 }
 
 :root[data-theme="light"] {
-  --p-page: #dde6f5;
-  --p-sidebar: rgba(255,255,255,0.55);
-  --p-sidebar-border: rgba(0,0,0,0.08);
-  --p-sidebar-label: rgba(0,0,0,0.35);
-  --p-nav-inactive: rgba(0,0,0,0.4);
-  --p-nav-active-bg: rgba(0,0,0,0.07);
-  --p-nav-active-bg2: rgba(0,0,0,0.03);
-  --p-nav-active-bdr: rgba(0,0,0,0.12);
-  --p-card: rgba(10,10,22,0.88);
-  --p-card-strong: rgba(10,10,22,0.94);
-  --p-card-border: rgba(255,255,255,0.10);
-  --p-card-hover: rgba(10,10,22,0.95);
+  --p-page: #0e0c08;
+  --p-sidebar: rgba(12,10,6,0.97);
+  --p-sidebar-border: rgba(196,151,70,0.18);
+  --p-sidebar-label: rgba(196,151,70,0.5);
+  --p-sidebar-text: #feeaa5;
+  --p-nav-inactive: rgba(220,185,130,0.5);
+  --p-nav-active-bg: rgba(196,151,70,0.16);
+  --p-nav-active-bg2: rgba(196,151,70,0.08);
+  --p-nav-active-bdr: rgba(196,151,70,0.32);
+  --p-card: rgba(196,151,70,0.055);
+  --p-card-strong: rgba(196,151,70,0.10);
+  --p-card-border: rgba(196,151,70,0.16);
+  --p-card-hover: rgba(196,151,70,0.09);
   --p-text: #ffffff;
-  --p-text-dim: rgba(255,255,255,0.45);
-  --p-text-muted: rgba(255,255,255,0.25);
-  --p-user-pill: rgba(0,0,0,0.08);
-  --p-user-pill-border: rgba(0,0,0,0.10);
-  --p-logo-bg1: rgba(0,0,0,0.15);
-  --p-logo-bg2: rgba(0,0,0,0.06);
-  --p-logo-border: rgba(0,0,0,0.15);
-  --p-toggle-bg: rgba(0,0,0,0.07);
-  --p-toggle-border: rgba(0,0,0,0.12);
-  --p-sidebar-text: rgba(0,0,0,0.85);
-  --p-heading: #1e293b;
-  --p-heading-dim: rgba(15,23,42,0.6);
-  --p-heading-muted: rgba(15,23,42,0.4);
-  --p-gauge-inner: #0a0a16;
+  --p-text-dim: rgba(220,190,145,0.65);
+  --p-text-muted: rgba(196,151,70,0.45);
+  --p-user-pill: rgba(196,151,70,0.09);
+  --p-user-pill-border: rgba(196,151,70,0.18);
+  --p-logo-bg1: rgba(196,151,70,0.25);
+  --p-logo-bg2: rgba(196,151,70,0.10);
+  --p-logo-border: rgba(196,151,70,0.30);
+  --p-toggle-bg: rgba(196,151,70,0.10);
+  --p-toggle-border: rgba(196,151,70,0.20);
+  --p-heading: #ffffff;
+  --p-heading-dim: rgba(254,234,165,0.72);
+  --p-heading-muted: rgba(196,151,70,0.50);
+  --p-gauge-inner: #0e0c08;
+  --p-gold: #e8af48;
+  --p-gold-dim: rgba(196,151,70,0.6);
+  --p-gold-muted: rgba(196,151,70,0.20);
+  --p-gold-border: rgba(196,151,70,0.16);
+  --p-specular: rgba(196,151,70,0.12);
 }
 
 /* ── Dark leaflet tiles — remove default white background ─────────────── */
@@ -123,19 +153,8 @@
   color: rgba(0,0,0,0.6) !important;
 }
 
-/* ── Light-mode page text override ───────────────────────────────────── */
-/* In light mode, text-white Tailwind class on PAGE-LEVEL elements becomes dark */
-[data-theme="light"] #pulse-main .text-white {
-  color: var(--p-heading) !important;
-}
-/* But inside dark-card containers, text-white stays white */
-[data-theme="light"] #pulse-main [style*="var(--p-card"] .text-white,
-[data-theme="light"] #pulse-main [style*="background: \"var(--p-card"] .text-white {
-  color: #ffffff !important;
-}
-/* Smooth transition for all text */
-[data-theme="light"] #pulse-main {
-  color: var(--p-heading);
+/* Both modes are dark — text-white always stays white */
+#pulse-main {
   transition: color 0.3s ease;
 }
 
@@ -149,6 +168,24 @@ body {
   font-family: var(--font-sans);
   background-color: var(--p-page);
   transition: background-color 0.3s ease;
+}
+
+/* ── Gold scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(196,151,70,0.22); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(196,151,70,0.38); }
+
+/* ── Global card specular top line ────────────────────────────────────── */
+/* Cards using var(--p-card) get a subtle gold top highlight */
+.pulse-card {
+  background: var(--p-card);
+  border: 1px solid var(--p-card-border);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 var(--p-specular), 0 1px 3px rgba(0,0,0,0.4);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 /* ── ATM Map — pulsing incident ring ──────────────────────────────────── */

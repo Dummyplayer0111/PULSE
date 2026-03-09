@@ -27,15 +27,14 @@ const ENGINEER_NAV = [
 function getInitialTheme(): 'dark' | 'light' {
   const stored = localStorage.getItem('pulse-theme') as 'dark' | 'light' | null;
   if (stored === 'dark' || stored === 'light') return stored;
-  if (window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
   return 'dark';
 }
 
 export default function Layout() {
-  const navigate  = useNavigate();
-  const dispatch  = useDispatch();
-  const auth      = useSelector((s: RootState) => s.auth);
-  const token     = localStorage.getItem('access_token');
+  const navigate   = useNavigate();
+  const dispatch   = useDispatch();
+  const auth       = useSelector((s: RootState) => s.auth);
+  const token      = localStorage.getItem('access_token');
   const isEngineer = auth.role === 'ENGINEER';
   const NAV        = isEngineer ? ENGINEER_NAV : ADMIN_NAV;
 
@@ -71,23 +70,21 @@ export default function Layout() {
         style={{
           background: 'var(--p-sidebar)',
           borderRight: '1px solid var(--p-sidebar-border)',
-          backdropFilter: 'blur(48px) saturate(160%)',
-          WebkitBackdropFilter: 'blur(48px) saturate(160%)',
-          boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.04), 6px 0 32px rgba(0,0,0,0.55)',
+          backdropFilter: 'blur(48px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(48px) saturate(180%)',
+          boxShadow: 'inset -1px 0 0 rgba(196,151,70,0.06), 6px 0 40px rgba(0,0,0,0.7)',
           transition: 'background 0.3s ease, border-color 0.3s ease',
         }}
       >
-        {/* ── Liquid glass specular highlights ── */}
-        {/* Top edge: catches the "light" above the panel */}
+        {/* ── Liquid gold specular highlights ── */}
         <div aria-hidden style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 1,
-          background: 'linear-gradient(90deg, transparent 5%, rgba(255,255,255,0.13) 50%, transparent 95%)',
+          background: 'linear-gradient(90deg, transparent 5%, rgba(196,151,70,0.18) 50%, transparent 95%)',
           pointerEvents: 'none', zIndex: 10,
         }} />
-        {/* Right edge: soft vertical glow where sidebar meets content */}
         <div aria-hidden style={{
           position: 'absolute', top: 0, right: 0, bottom: 0, width: 1,
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 40%, transparent 100%)',
+          background: 'linear-gradient(180deg, rgba(196,151,70,0.14) 0%, rgba(196,151,70,0.05) 40%, transparent 100%)',
           pointerEvents: 'none', zIndex: 10,
         }} />
 
@@ -101,13 +98,13 @@ export default function Layout() {
             style={{
               background: 'linear-gradient(135deg, var(--p-logo-bg1), var(--p-logo-bg2))',
               border: '1px solid var(--p-logo-border)',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.14), 0 0 10px rgba(255,255,255,0.04)',
+              boxShadow: 'inset 0 1px 0 rgba(196,151,70,0.20), 0 0 12px rgba(196,151,70,0.08)',
             }}
           >
-            <Activity size={15} style={{ color: 'var(--p-sidebar-text)' }} />
+            <Activity size={15} style={{ color: '#e8af48' }} />
           </div>
           <div>
-            <p className="text-sm font-bold tracking-tight leading-none" style={{ color: 'var(--p-sidebar-text)' }}>PULSE</p>
+            <p className="text-sm font-bold tracking-tight leading-none" style={{ color: '#feeaa5', textShadow: '0 0 12px rgba(196,151,70,0.4)' }}>PULSE</p>
             <div className="flex items-center gap-1.5 mt-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ animation: 'pulse 2s infinite' }} />
               <span className="text-[9px] uppercase tracking-widest font-medium" style={{ color: 'var(--p-sidebar-label)' }}>
@@ -130,7 +127,7 @@ export default function Layout() {
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              color: 'var(--p-text)',
+              color: '#e8af48',
               transition: 'all 0.2s',
               flexShrink: 0,
             }}
@@ -154,7 +151,7 @@ export default function Layout() {
               to={to}
               className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150"
               style={({ isActive }) => ({
-                color: isActive ? 'var(--p-sidebar-text)' : 'var(--p-nav-inactive)',
+                color: isActive ? '#feeaa5' : 'var(--p-nav-inactive)',
                 background: isActive
                   ? `linear-gradient(135deg, var(--p-nav-active-bg), var(--p-nav-active-bg2))`
                   : 'transparent',
@@ -162,14 +159,15 @@ export default function Layout() {
                   ? '1px solid var(--p-nav-active-bdr)'
                   : '1px solid transparent',
                 boxShadow: isActive
-                  ? 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 0 0 1px rgba(255,255,255,0.04)'
+                  ? 'inset 0 1px 0 rgba(196,151,70,0.16), 0 0 12px rgba(196,151,70,0.06)'
                   : 'none',
+                textShadow: isActive ? '0 0 10px rgba(196,151,70,0.35)' : 'none',
               })}
               onMouseEnter={e => {
                 const el = e.currentTarget as HTMLAnchorElement;
                 if (el.getAttribute('aria-current') !== 'page') {
-                  el.style.color = 'var(--p-sidebar-text)';
-                  el.style.background = 'rgba(255,255,255,0.05)';
+                  el.style.color = '#feeaa5';
+                  el.style.background = 'rgba(196,151,70,0.07)';
                 }
               }}
               onMouseLeave={e => {
@@ -191,12 +189,16 @@ export default function Layout() {
           {/* User pill */}
           <div
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1"
-            style={{ background: 'var(--p-user-pill)', border: '1px solid var(--p-user-pill-border)' }}
+            style={{
+              background: 'var(--p-user-pill)',
+              border: '1px solid var(--p-user-pill-border)',
+              boxShadow: 'inset 0 1px 0 rgba(196,151,70,0.08)',
+            }}
           >
             <div
               className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold"
               style={{
-                color: 'var(--p-sidebar-text)',
+                color: '#feeaa5',
                 background: 'linear-gradient(135deg, var(--p-logo-bg1), var(--p-logo-bg2))',
                 border: '1px solid var(--p-logo-border)',
               }}
@@ -204,7 +206,7 @@ export default function Layout() {
               {(auth.username || 'A')[0].toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold truncate leading-none" style={{ color: 'var(--p-sidebar-text)' }}>
+              <p className="text-xs font-semibold truncate leading-none" style={{ color: '#feeaa5' }}>
                 {auth.username || 'User'}
               </p>
               <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--p-sidebar-label)' }}>
@@ -225,12 +227,14 @@ export default function Layout() {
             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150"
             style={{ border: '1px solid transparent', color: 'var(--p-nav-inactive)', background: 'transparent' }}
             onMouseEnter={e => {
-              e.currentTarget.style.color = 'var(--p-sidebar-text)';
-              e.currentTarget.style.background = 'var(--p-nav-active-bg)';
+              e.currentTarget.style.color = '#feeaa5';
+              e.currentTarget.style.background = 'rgba(196,151,70,0.08)';
+              e.currentTarget.style.borderColor = 'rgba(196,151,70,0.18)';
             }}
             onMouseLeave={e => {
               e.currentTarget.style.color = 'var(--p-nav-inactive)';
               e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.borderColor = 'transparent';
             }}
           >
             <LogOut size={15} />
