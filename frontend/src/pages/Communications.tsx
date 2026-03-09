@@ -5,7 +5,7 @@ import {
   useSendNotificationMutation,
   useGetTemplatesQuery,
   useCreateTemplateMutation,
-} from '../services/pulseApi';
+} from '../services/payguardApi';
 import Modal from '../components/common/Modal';
 import { formatDate } from '../utils';
 

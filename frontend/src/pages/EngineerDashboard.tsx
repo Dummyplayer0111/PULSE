@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
-import { useGetMyIncidentsQuery, useResolveIncidentMutation, useUpdateIncidentMutation } from '../services/pulseApi';
+import { useGetMyIncidentsQuery, useResolveIncidentMutation, useUpdateIncidentMutation } from '../services/payguardApi';
 import { Wrench, CheckCircle, Clock, AlertTriangle, X } from 'lucide-react';
 
 const SEV_COLOR: Record<string, string> = {

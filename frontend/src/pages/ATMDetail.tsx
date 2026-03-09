@@ -7,7 +7,7 @@ import {
   useGetATMIncidentsQuery,
   useGetATMHealthHistoryQuery,
   useGetATMTransactionVolumeQuery,
-} from '../services/pulseApi';
+} from '../services/payguardApi';
 import { formatDate, formatDateTime } from '../utils';
 import { useWebSocket } from '../hooks/useWebSocket';
 

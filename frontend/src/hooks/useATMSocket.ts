@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { pulseApi } from '../services/pulseApi';
+import { payguardApi } from '../services/payguardApi';
 
 type ConnectionState = 'connecting' | 'connected' | 'disconnected';
 
@@ -47,7 +47,7 @@ export function useATMSocket() {
               return [...prev, msg.atm]; // new ATM
             });
             // Also invalidate cache so background refetch keeps things in sync
-            dispatch(pulseApi.util.invalidateTags(['ATMs'] as any));
+            dispatch(payguardApi.util.invalidateTags(['ATMs'] as any));
           }
         } catch {
           // ignore malformed messages

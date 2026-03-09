@@ -11,7 +11,7 @@ import {
   useGetAIPredictionsQuery,
   useGetRootCauseStatsQuery,
   useGetChannelsQuery,
-} from '../services/pulseApi';
+} from '../services/payguardApi';
 import { formatDate, formatConfidence } from '../utils';
 import { usePipelineSocket } from '../hooks/usePipelineSocket';
 import { useSelector } from 'react-redux';
@@ -231,7 +231,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-white">Operations Center</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--p-heading-dim)' }}>PULSE real-time ATM & payment monitoring</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--p-heading-dim)' }}>PayGuard real-time ATM & payment monitoring</p>
         </div>
         <div className="flex items-center gap-2">
           {/* WS status */}

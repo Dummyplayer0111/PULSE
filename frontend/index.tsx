@@ -117,7 +117,7 @@ const LIVE_LOGS = [
 ];
 
 const TICKER = [
-  'PULSE OPERATIONS CENTER','20 ATMs Online','AI Root Cause Analysis',
+  'PayGuard OPERATIONS CENTER','20 ATMs Online','AI Root Cause Analysis',
   'Self-Healing Automation','Real-Time WebSocket','8 Indian Languages',
   '97.3% UPI Uptime','Predictive Failure Scoring','Anomaly Detection',
   'Django + React','scikit-learn Classifier','Zero Downtime',
@@ -250,7 +250,7 @@ function FloatingNav() {
           backgroundRepeat: 'repeat', backgroundSize: '128px',
         }} />
 
-        {/* PULSE wordmark — clicking returns to top */}
+        {/* PayGuard wordmark — clicking returns to top */}
         <button onClick={() => scrollTo('hero')} style={{
           background: 'none', border: 'none', cursor: 'pointer',
           padding: '0 14px 0 8px',
@@ -262,7 +262,7 @@ function FloatingNav() {
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.78'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
         >
-          PULSE
+          PayGuard
         </button>
 
         {/* Divider */}
@@ -445,7 +445,7 @@ function LandingPage() {
         .liquid-shine { background: linear-gradient(105deg, transparent 15%, rgba(255,255,255,0.09) 45%, rgba(255,255,255,0.04) 55%, transparent 85%);
                         background-size: 300% 100%; animation: liquidFlow 3.5s cubic-bezier(0.4,0,0.2,1) infinite; }
         .glass-shimmer { animation: glassShimmer 5s ease-in-out infinite; }
-        .glow-pulse   { animation: goldOrb  3.5s ease-in-out infinite; }
+        .glow-payguard   { animation: goldOrb  3.5s ease-in-out infinite; }
         .gold-pdot    { animation: goldPdot 2.2s ease-in-out infinite; }
         .gold-flow    { background: linear-gradient(105deg,transparent 15%,rgba(200,134,42,0.16) 45%,rgba(232,168,64,0.09) 55%,transparent 85%); background-size:300% 100%; animation:goldCardFlow 3.8s cubic-bezier(0.4,0,0.2,1) infinite; }
         .border-glow  { animation: borderGlow 4s ease-in-out infinite; }
@@ -531,7 +531,7 @@ function LandingPage() {
           <div className="relative flex items-center justify-center" style={{ height:'clamp(340px,34vw,450px)' }}>
             {/* Central glow behind stack */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="glow-pulse" style={{ width:380, height:380, background:'radial-gradient(circle,rgba(196,151,70,0.13) 0%,rgba(83,53,23,0.06) 45%,transparent 68%)', filter:'blur(55px)' }} />
+              <div className="glow-payguard" style={{ width:380, height:380, background:'radial-gradient(circle,rgba(196,151,70,0.13) 0%,rgba(83,53,23,0.06) 45%,transparent 68%)', filter:'blur(55px)' }} />
             </div>
             <div className="relative w-full h-full flex items-center justify-center" style={{ perspective:'1000px', paddingLeft:'clamp(40px,6vw,90px)' }}>
               {CARDS.map((card, index) => {
@@ -603,7 +603,7 @@ function LandingPage() {
                           animate={{ color: isActive ? '#feeaa5' : 'rgba(255,255,255,0.38)' }}
                           transition={{ duration:1.1, ease:[0.16,1,0.3,1], delay: isActive ? 0.25 : 0 }}
                           style={{ fontSize:'clamp(0.78rem,1.1vw,1rem)' }}>
-                          PULSE
+                          PayGuard
                         </motion.span>
                         <div className="flex gap-1.5">
                           {[0,1].map(j => (
@@ -756,7 +756,7 @@ function LandingPage() {
                 <div className="w-3.5 h-3.5 rounded-full" style={{ background:'rgba(255,80,80,0.45)' }} />
                 <div className="w-3.5 h-3.5 rounded-full" style={{ background:'rgba(255,180,0,0.45)' }} />
                 <div className="w-3.5 h-3.5 rounded-full" style={{ background:'rgba(80,200,80,0.45)' }} />
-                <span className="ml-3 font-mono" style={{ color:'rgba(255,255,255,0.28)', fontSize:'clamp(0.7rem,0.9vw,0.82rem)' }}>pulse-ai-engine — bash</span>
+                <span className="ml-3 font-mono" style={{ color:'rgba(255,255,255,0.28)', fontSize:'clamp(0.7rem,0.9vw,0.82rem)' }}>payguard-ai-engine — bash</span>
               </div>
               <div className="font-mono leading-7 relative z-10" style={{ padding:'clamp(1.2rem,2vw,1.8rem)', minHeight:320, fontSize:'clamp(0.72rem,0.95vw,0.86rem)' }}>
                 {TERMINAL.map((line, i) => i < termLine && (
@@ -937,7 +937,7 @@ function LandingPage() {
       {/* ── FOOTER ──────────────────────────────────────────────────────────── */}
       <footer style={{ background:'#000', borderTop:'1px solid rgba(255,255,255,0.07)', padding:'clamp(1.5rem,2.5vw,2.2rem) 0' }}>
         <div className="max-w-screen-xl mx-auto px-8 md:px-14 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <span className="font-black" style={{ color:'rgba(196,151,70,0.72)', fontSize:'clamp(1rem,1.4vw,1.2rem)', letterSpacing:'-0.02em' }}>PULSE</span>
+          <span className="font-black" style={{ color:'rgba(196,151,70,0.72)', fontSize:'clamp(1rem,1.4vw,1.2rem)', letterSpacing:'-0.02em' }}>PayGuard</span>
           <span className="font-mono text-center" style={{ color:'rgba(255,255,255,0.18)', fontSize:'clamp(0.65rem,0.85vw,0.78rem)' }}>
             Payment Uptime &amp; Log-based Smart Engine · Problem #2 &amp; #7
           </span>
@@ -1105,9 +1105,9 @@ function LoginPage() {
             backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`,
             backgroundRepeat:'repeat', backgroundSize:'128px' }} />
 
-          {/* PULSE wordmark */}
+          {/* PayGuard wordmark */}
           <span className="font-black select-none" style={{ padding:'0 14px 0 8px', fontSize:'1.15rem', letterSpacing:'-0.03em', color:'#feeaa5', position:'relative', zIndex:5, lineHeight:1, textShadow:'0 0 18px rgba(196,151,70,0.45)' }}>
-            PULSE
+            PayGuard
           </span>
 
           <div style={{ width:1, height:20, background:'rgba(255,255,255,0.1)', margin:'0 4px', flexShrink:0 }} />
@@ -1234,7 +1234,7 @@ function LoginPage() {
           {/* Footer note */}
           <motion.p initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.5, duration:0.6 }}
             className="font-mono text-center" style={{ color:'rgba(196,151,70,0.38)', fontSize:'0.72rem', marginTop:'1.5rem', letterSpacing:'0.1em' }}>
-            PULSE · PAYMENT UPTIME &amp; LOG-BASED SMART ENGINE
+            PayGuard · PAYMENT UPTIME &amp; LOG-BASED SMART ENGINE
           </motion.p>
         </div>
       </div>

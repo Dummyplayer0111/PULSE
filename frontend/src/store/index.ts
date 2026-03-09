@@ -1,18 +1,18 @@
 import { configureStore } from '@reduxjs/toolkit';
-import { pulseApi } from '../services/pulseApi';
+import { payguardApi } from '../services/payguardApi';
 import uiReducer from './uiSlice';
 import pipelineReducer from './pipelineSlice';
 import authReducer from './authSlice';
 
 export const store = configureStore({
   reducer: {
-    [pulseApi.reducerPath]: pulseApi.reducer,
+    [payguardApi.reducerPath]: payguardApi.reducer,
     ui: uiReducer,
     pipeline: pipelineReducer,
     auth: authReducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(pulseApi.middleware),
+    getDefaultMiddleware().concat(payguardApi.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

@@ -41,8 +41,8 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
   return result;
 };
 
-export const pulseApi = createApi({
-  reducerPath: 'pulseApi',
+export const payguardApi = createApi({
+  reducerPath: 'payguardApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Incidents', 'Logs', 'Anomalies', 'SelfHealActions', 'Notifications', 'Templates', 'ATMs', 'Transactions'],
   endpoints: (builder) => ({
@@ -236,4 +236,4 @@ export const {
   useSendNotificationMutation,
   useGetTemplatesQuery,
   useCreateTemplateMutation,
-} = pulseApi;
+} = payguardApi;

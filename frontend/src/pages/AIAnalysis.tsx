@@ -16,7 +16,7 @@ import {
   useGetATMsQuery,
   useGetAIFailureTrendQuery,
   useGetRecentPipelineEventsQuery,
-} from '../services/pulseApi';
+} from '../services/payguardApi';
 import { usePipelineSocket, PipelineEvent } from '../hooks/usePipelineSocket';
 import { RootState } from '../store';
 

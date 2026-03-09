@@ -9,7 +9,7 @@ import {
   useGetSimulatorStatusQuery,
   useStartSimulatorMutation,
   useStopSimulatorMutation,
-} from '../services/pulseApi';
+} from '../services/payguardApi';
 
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 
@@ -158,7 +158,7 @@ function SimulatorPanel() {
 // ─── Alert Threshold Panel ─────────────────────────────────────────────────────
 
 function AlertThresholdsPanel() {
-  const [thresholds, setThresholds] = useLocalStorage('pulse_thresholds', DEFAULT_THRESHOLDS);
+  const [thresholds, setThresholds] = useLocalStorage('payguard_thresholds', DEFAULT_THRESHOLDS);
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [local, setLocal] = useState(thresholds);
@@ -245,7 +245,7 @@ function AlertThresholdsPanel() {
 // ─── Self-Heal Rules Panel ─────────────────────────────────────────────────────
 
 function SelfHealRulesPanel() {
-  const [rules, setRules] = useLocalStorage('pulse_heal_rules', DEFAULT_HEAL_RULES);
+  const [rules, setRules] = useLocalStorage('payguard_heal_rules', DEFAULT_HEAL_RULES);
   const [saved, setSaved] = useState(false);
 
   const toggle = (key: string) => {
@@ -311,7 +311,7 @@ function SelfHealRulesPanel() {
 // ─── AI Config Panel ───────────────────────────────────────────────────────────
 
 function AIConfigPanel() {
-  const [conf, setConf] = useLocalStorage('pulse_ai_conf', DEFAULT_AI_CONF);
+  const [conf, setConf] = useLocalStorage('payguard_ai_conf', DEFAULT_AI_CONF);
   const [localConf, setLocalConf] = useState(conf);
   const [saved, setSaved] = useState(false);
 
@@ -403,16 +403,16 @@ export default function Settings() {
   useEffect(() => {
     const handler = (e: Event) =>
       setCurrentTheme((e as CustomEvent).detail as 'dark' | 'light');
-    window.addEventListener('pulse-theme-change', handler);
-    return () => window.removeEventListener('pulse-theme-change', handler);
+    window.addEventListener('payguard-theme-change', handler);
+    return () => window.removeEventListener('payguard-theme-change', handler);
   }, []);
 
   const toggleTheme = () => {
     const next = currentTheme === 'dark' ? 'light' : 'dark';
     setCurrentTheme(next);
     document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('pulse-theme', next);
-    window.dispatchEvent(new CustomEvent('pulse-theme-change', { detail: next }));
+    localStorage.setItem('payguard-theme', next);
+    window.dispatchEvent(new CustomEvent('payguard-theme-change', { detail: next }));
   };
 
   return (

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ScrollText, Search, Download, RefreshCw } from 'lucide-react';
-import { useGetLogsQuery } from '../services/pulseApi';
+import { useGetLogsQuery } from '../services/payguardApi';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 const LEVELS = ['ALL', 'INFO', 'WARN', 'ERROR', 'CRITICAL'] as const;

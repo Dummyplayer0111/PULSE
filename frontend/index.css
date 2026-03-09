@@ -154,7 +154,7 @@
 }
 
 /* Both modes are dark — text-white always stays white */
-#pulse-main {
+#payguard-main {
   transition: color 0.3s ease;
 }
 
@@ -178,7 +178,7 @@ body {
 
 /* ── Global card specular top line ────────────────────────────────────── */
 /* Cards using var(--p-card) get a subtle gold top highlight */
-.pulse-card {
+.payguard-card {
   background: var(--p-card);
   border: 1px solid var(--p-card-border);
   border-radius: 16px;

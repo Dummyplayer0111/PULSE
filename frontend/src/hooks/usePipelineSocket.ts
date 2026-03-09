@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { pulseApi } from '../services/pulseApi';
+import { payguardApi } from '../services/payguardApi';
 import { addEvent } from '../store/pipelineSlice';
 
 export interface PipelineEvent {
@@ -59,7 +59,7 @@ export function usePipelineSocket() {
             // Store in Redux — persists across page navigation
             dispatch(addEvent(msg as PipelineEvent));
             // Also invalidate caches so Incidents / Self-Heal pages refresh
-            dispatch(pulseApi.util.invalidateTags(['Incidents', 'SelfHealActions', 'ATMs'] as any));
+            dispatch(payguardApi.util.invalidateTags(['Incidents', 'SelfHealActions', 'ATMs'] as any));
           }
         } catch { /* ignore malformed */ }
       };

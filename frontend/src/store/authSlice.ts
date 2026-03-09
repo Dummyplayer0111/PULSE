@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-const STORAGE_KEY = 'pulse_user';
+const STORAGE_KEY = 'payguard_user';
 
 interface AuthState {
   username: string;

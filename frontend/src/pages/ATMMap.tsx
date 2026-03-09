@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AlertCircle, Map, Wifi, WifiOff, Loader, Filter, ChevronDown } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useGetATMsQuery } from '../services/pulseApi';
+import { useGetATMsQuery } from '../services/payguardApi';
 import { selectATM, closeSidePanel } from '../store/uiSlice';
 import { RootState } from '../store';
 import ATMMapComponent from '../components/map/ATMMap';

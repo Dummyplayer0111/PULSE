@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ShieldAlert, AlertTriangle, CheckCircle, XCircle, TrendingUp, MapPin, CreditCard, Shield } from 'lucide-react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
-import { useGetAnomalyFlagsQuery, useUpdateAnomalyFlagMutation, useConfirmAnomalyFlagMutation, useGetATMsQuery, useGetTransactionsQuery } from '../services/pulseApi';
+import { useGetAnomalyFlagsQuery, useUpdateAnomalyFlagMutation, useConfirmAnomalyFlagMutation, useGetATMsQuery, useGetTransactionsQuery } from '../services/payguardApi';
 import Modal from '../components/common/Modal';
 import { formatDate, shortId } from '../utils';
 

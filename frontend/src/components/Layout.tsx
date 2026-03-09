@@ -25,7 +25,7 @@ const ENGINEER_NAV = [
 ];
 
 function getInitialTheme(): 'dark' | 'light' {
-  const stored = localStorage.getItem('pulse-theme') as 'dark' | 'light' | null;
+  const stored = localStorage.getItem('payguard-theme') as 'dark' | 'light' | null;
   if (stored === 'dark' || stored === 'light') return stored;
   return 'dark';
 }
@@ -42,7 +42,7 @@ export default function Layout() {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('pulse-theme', theme);
+    localStorage.setItem('payguard-theme', theme);
   }, [theme]);
 
   useEffect(() => {
@@ -53,7 +53,7 @@ export default function Layout() {
 
   const toggle = () => setTheme(t => {
     const next = t === 'dark' ? 'light' : 'dark';
-    window.dispatchEvent(new CustomEvent('pulse-theme-change', { detail: next }));
+    window.dispatchEvent(new CustomEvent('payguard-theme-change', { detail: next }));
     return next;
   });
 
@@ -104,7 +104,7 @@ export default function Layout() {
             <Activity size={15} style={{ color: '#e8af48' }} />
           </div>
           <div>
-            <p className="text-sm font-bold tracking-tight leading-none" style={{ color: '#feeaa5', textShadow: '0 0 12px rgba(196,151,70,0.4)' }}>PULSE</p>
+            <p className="text-sm font-bold tracking-tight leading-none" style={{ color: '#feeaa5', textShadow: '0 0 12px rgba(196,151,70,0.4)' }}>PayGuard</p>
             <div className="flex items-center gap-1.5 mt-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ animation: 'pulse 2s infinite' }} />
               <span className="text-[9px] uppercase tracking-widest font-medium" style={{ color: 'var(--p-sidebar-label)' }}>
@@ -244,7 +244,7 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <main id="pulse-main" className="ml-60 flex-1 min-h-screen" style={{ background: 'var(--p-page)', transition: 'background 0.3s ease' }}>
+      <main id="payguard-main" className="ml-60 flex-1 min-h-screen" style={{ background: 'var(--p-page)', transition: 'background 0.3s ease' }}>
         <Outlet />
       </main>
     </div>

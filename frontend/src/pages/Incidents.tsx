@@ -5,7 +5,7 @@ import {
   useAssignIncidentMutation,
   useResolveIncidentMutation,
   useGetEngineersQuery,
-} from '../services/pulseApi';
+} from '../services/payguardApi';
 import Modal from '../components/common/Modal';
 import { formatDate, formatDateTime, shortId } from '../utils';
 
@@ -223,7 +223,7 @@ function IncidentDetailModal({ inc, onClose }: { inc: any; onClose: () => void }
             Self-Heal: {HEAL_LABELS[healKey] ?? healKey}
           </p>
           <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            Automatically triggered by the PULSE self-heal engine
+            Automatically triggered by the PayGuard self-heal engine
           </p>
         </div>
         <span
