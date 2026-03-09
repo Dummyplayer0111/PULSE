@@ -938,7 +938,8 @@ export default function AIAnalysisPage() {
       </div>
 
       {/* ── Main layout ── */}
-      <div className="flex gap-4 flex-1">
+      <div className="flex flex-col gap-4 flex-1">
+      <div className="flex gap-4">
 
         {/* Left: Live pipeline feed */}
         <div className="flex-1 flex flex-col gap-3" style={{ minWidth: 0 }}>
@@ -1089,158 +1090,123 @@ export default function AIAnalysisPage() {
             </div>
           </div>
 
-          {/* Root Cause Breakdown — Donut */}
-          <div
-            className="rounded-2xl p-4 flex flex-col gap-3"
-            style={{ background: 'var(--p-card)', border: '1px solid rgba(255,255,255,0.07)' }}
-          >
-            <div className="flex items-center gap-2">
-              <BarChart2 size={14} style={{ color: '#a855f7' }} />
-              <span className="text-sm font-semibold text-white">Root Cause Breakdown</span>
-            </div>
-            <DonutChart stats={stats} />
+        </div>
+      </div>{/* end top flex row */}
+
+      {/* ── Bottom metrics row ── */}
+      <div className="grid grid-cols-4 gap-3">
+
+        {/* Root Cause Breakdown */}
+        <div
+          className="rounded-2xl p-4 flex flex-col gap-3"
+          style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
+        >
+          <div className="flex items-center gap-2">
+            <BarChart2 size={14} style={{ color: '#a855f7' }} />
+            <span className="text-sm font-semibold text-white">Root Cause Breakdown</span>
           </div>
+          <DonutChart stats={stats} />
+        </div>
 
-          {/* 7-Day Failure Trend */}
-          <div
-            className="rounded-2xl p-4 flex flex-col gap-3"
-            style={{ background: 'var(--p-card)', border: '1px solid rgba(255,255,255,0.07)' }}
-          >
-            <div className="flex items-center gap-2">
-              <Activity size={14} style={{ color: '#60a5fa' }} />
-              <span className="text-sm font-semibold text-white">7-Day Failure Trend</span>
-            </div>
-            <FailureTrendChart />
+        {/* 7-Day Failure Trend */}
+        <div
+          className="rounded-2xl p-4 flex flex-col gap-3"
+          style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
+        >
+          <div className="flex items-center gap-2">
+            <Activity size={14} style={{ color: '#60a5fa' }} />
+            <span className="text-sm font-semibold text-white">7-Day Failure Trend</span>
           </div>
+          <FailureTrendChart />
+        </div>
 
-          {/* Pipeline Flow */}
-          <div
-            className="rounded-2xl p-4"
-            style={{ background: 'var(--p-card)', border: '1px solid rgba(255,255,255,0.07)' }}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <Zap size={14} style={{ color: '#f59e0b' }} />
-              <span className="text-sm font-semibold text-white">Pipeline Flow</span>
-            </div>
-            <div className="flex flex-col gap-2">
-              {[
-                { Icon: Activity,      label: 'ATM Simulator',     sub: running ? 'Generating logs…' : 'Stopped', color: running ? '#4ade80' : '#6b7280', active: running },
-                { Icon: Brain,         label: 'FastAPI ML Engine',  sub: 'Auto-classify each event',  color: '#a855f7', active: wsStatus === 'connected' },
-                { Icon: AlertTriangle, label: 'Incident Engine',    sub: `${totalIncidents} auto-created`,         color: '#f97316', active: totalIncidents > 0 },
-                { Icon: Zap,           label: 'Self-Heal Engine',   sub: `${totalSelfHeals} executed`,             color: '#f59e0b', active: totalSelfHeals > 0 },
-                { Icon: CheckCircle,   label: 'Dashboard Update',   sub: 'Real-time via WebSocket',   color: '#60a5fa', active: wsStatus === 'connected' },
-              ].map(({ Icon, label, sub, color, active }) => (
-                <div key={label} className="flex items-center gap-2.5">
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                    style={{
-                      background: active ? `${color}22` : 'var(--p-card)',
-                      border: `1px solid ${active ? color + '44' : 'rgba(255,255,255,0.08)'}`,
-                    }}
-                  >
-                    <Icon size={12} style={{ color: active ? color : 'rgba(255,255,255,0.3)' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-semibold" style={{ color: active ? 'white' : 'rgba(255,255,255,0.4)' }}>
-                      {label}
-                    </p>
-                    <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{sub}</p>
-                  </div>
-                  {active && (
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse" style={{ background: color }} />
-                  )}
-                </div>
-              ))}
-            </div>
+        {/* Pipeline Flow */}
+        <div
+          className="rounded-2xl p-4 flex flex-col gap-3"
+          style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
+        >
+          <div className="flex items-center gap-2">
+            <Zap size={14} style={{ color: '#f59e0b' }} />
+            <span className="text-sm font-semibold text-white">Pipeline Flow</span>
           </div>
-
-          {/* Model Performance Stats */}
-          <div
-            className="rounded-2xl p-4 flex flex-col gap-3"
-            style={{ background: 'var(--p-card)', border: '1px solid rgba(255,255,255,0.07)' }}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Brain size={14} style={{ color: '#a855f7' }} />
-                <span className="text-sm font-semibold text-white">Model Performance</span>
-              </div>
-              <span
-                className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7' }}
-              >
-                scikit-learn
-              </span>
-            </div>
-
-            {/* Primary metrics */}
+          <div className="flex flex-col gap-2">
             {[
-              { label: 'Precision', value: 0.91, color: '#4ade80',  desc: 'True positives / all positives flagged' },
-              { label: 'Recall',    value: 0.87, color: '#60a5fa',  desc: 'True positives / all actual failures' },
-              { label: 'F1 Score',  value: 0.89, color: '#a855f7',  desc: 'Harmonic mean of Precision & Recall' },
-            ].map(({ label, value, color, desc }) => {
-              const pct = Math.round(value * 100);
-              return (
-                <div key={label} className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-semibold text-white">{label}</span>
-                      <span className="text-[10px] ml-2" style={{ color: 'rgba(255,255,255,0.3)' }}>{desc}</span>
-                    </div>
-                    <span className="text-sm font-bold" style={{ color }}>{value.toFixed(2)}</span>
-                  </div>
-                  <div className="rounded-full overflow-hidden" style={{ height: 5, background: 'rgba(255,255,255,0.07)' }}>
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${color}99, ${color})`, transition: 'width 0.6s ease' }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Divider */}
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)' }} />
-
-            {/* Sub-model badges */}
-            <div className="space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                Models in use
-              </p>
-              {[
-                { name: 'Root Cause Classifier',  tech: 'Keyword rules + event-code lookup', acc: '91%',  color: '#4ade80' },
-                { name: 'Anomaly Detector',        tech: 'Z-score vs 30-day baseline',        acc: '87%',  color: '#f59e0b' },
-                { name: 'Failure Predictor',       tech: 'Rolling slope on health time-series', acc: '84%', color: '#60a5fa' },
-              ].map(({ name, tech, acc, color }) => (
+              { Icon: Activity,      label: 'ATM Simulator',    sub: running ? 'Generating logs…' : 'Stopped',  color: running ? '#4ade80' : '#6b7280', active: running },
+              { Icon: Brain,         label: 'FastAPI ML Engine', sub: 'Auto-classify each event',                color: '#a855f7', active: wsStatus === 'connected' },
+              { Icon: AlertTriangle, label: 'Incident Engine',   sub: `${totalIncidents} auto-created`,          color: '#f97316', active: totalIncidents > 0 },
+              { Icon: Zap,           label: 'Self-Heal Engine',  sub: `${totalSelfHeals} executed`,              color: '#f59e0b', active: totalSelfHeals > 0 },
+              { Icon: CheckCircle,   label: 'Dashboard Update',  sub: 'Real-time via WebSocket',                 color: '#60a5fa', active: wsStatus === 'connected' },
+            ].map(({ Icon, label, sub, color, active }) => (
+              <div key={label} className="flex items-center gap-2.5">
                 <div
-                  key={name}
-                  className="flex items-center justify-between px-3 py-2 rounded-xl"
-                  style={{ background: `${color}0a`, border: `1px solid ${color}1a` }}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ background: active ? `${color}22` : 'var(--p-card-strong)', border: `1px solid ${active ? color + '44' : 'var(--p-card-border)'}` }}
                 >
-                  <div>
-                    <p className="text-[11px] font-semibold" style={{ color }}>{name}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{tech}</p>
-                  </div>
-                  <span className="text-xs font-bold" style={{ color }}>{acc}</span>
+                  <Icon size={12} style={{ color: active ? color : 'rgba(255,255,255,0.3)' }} />
                 </div>
-              ))}
-            </div>
-
-            {/* Footer meta */}
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>
-                Trained on 500+ synthetic ATM logs
-              </span>
-              <span
-                className="text-[9px] px-2 py-0.5 rounded-full font-medium"
-                style={{ background: 'rgba(74,222,128,0.1)', color: '#4ade80' }}
-              >
-                ● Evaluated
-              </span>
-            </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-semibold" style={{ color: active ? 'white' : 'rgba(255,255,255,0.4)' }}>{label}</p>
+                  <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{sub}</p>
+                </div>
+                {active && <span className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse" style={{ background: color }} />}
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+
+        {/* Model Performance */}
+        <div
+          className="rounded-2xl p-4 flex flex-col gap-3"
+          style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Brain size={14} style={{ color: '#a855f7' }} />
+              <span className="text-sm font-semibold text-white">Model Performance</span>
+            </div>
+            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7' }}>
+              scikit-learn
+            </span>
+          </div>
+          {[
+            { label: 'Precision', value: 0.91, color: '#4ade80', desc: 'True positives / all positives flagged' },
+            { label: 'Recall',    value: 0.87, color: '#60a5fa', desc: 'True positives / all actual failures' },
+            { label: 'F1 Score',  value: 0.89, color: '#a855f7', desc: 'Harmonic mean of Precision & Recall' },
+          ].map(({ label, value, color, desc }) => (
+            <div key={label} className="space-y-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-white">{label}</span>
+                  <span className="text-[10px] ml-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{desc}</span>
+                </div>
+                <span className="text-sm font-bold" style={{ color }}>{value.toFixed(2)}</span>
+              </div>
+              <div className="rounded-full overflow-hidden" style={{ height: 5, background: 'rgba(255,255,255,0.07)' }}>
+                <div className="h-full rounded-full" style={{ width: `${Math.round(value * 100)}%`, background: `linear-gradient(90deg,${color}99,${color})`, transition: 'width 0.6s ease' }} />
+              </div>
+            </div>
+          ))}
+          <div style={{ height: 1, background: 'var(--p-card-border)' }} />
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Models in use</p>
+            {[
+              { name: 'Root Cause Classifier', tech: 'Keyword rules + event-code lookup',     acc: '91%', color: '#4ade80' },
+              { name: 'Anomaly Detector',       tech: 'Z-score vs 30-day baseline',            acc: '87%', color: '#f59e0b' },
+              { name: 'Failure Predictor',      tech: 'Rolling slope on health time-series',   acc: '84%', color: '#60a5fa' },
+            ].map(({ name, tech, acc, color }) => (
+              <div key={name} className="flex items-center justify-between px-2.5 py-1.5 rounded-xl" style={{ background: `${color}0a`, border: `1px solid ${color}1a` }}>
+                <div>
+                  <p className="text-[10px] font-semibold" style={{ color }}>{name}</p>
+                  <p className="text-[9px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{tech}</p>
+                </div>
+                <span className="text-xs font-bold" style={{ color }}>{acc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>{/* end bottom grid */}
+      </div>{/* end outer flex-col */}
     </div>
   );
 }
