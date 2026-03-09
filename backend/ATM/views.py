@@ -673,12 +673,15 @@ def _parse_raw_log(message):
     text = message.upper()
 
     # 1. Exact known event-code token in text — highest priority
+    _SUCCESS_CODES = {"CARD_READ_SUCCESS", "CASH_DISPENSE_OK"}
     for code in _EVENT_CODES:
         if code in text:
             for level in ("CRITICAL", "ERROR", "WARN", "WARNING", "INFO"):
                 if level in text:
                     return code, "WARN" if level == "WARNING" else level
-            return code, "ERROR"
+            # Infer level from code name: SUCCESS/OK events are INFO, not ERROR
+            inferred = "INFO" if code in _SUCCESS_CODES else "ERROR"
+            return code, inferred
 
     # 2. Keyword heuristics for free-form log text
     for keywords, event_code in _KEYWORD_MAP:

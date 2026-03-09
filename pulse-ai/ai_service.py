@@ -27,9 +27,6 @@ async def classify(data: dict = Body(...)):
         "HARDWARE_JAM":         ("CASH_JAM", "ALERT_ENGINEER",  0.97),
         "MALWARE_SIGNATURE":    ("FRAUD",    "FREEZE_ATM",      0.99),
         "UPS_FAILURE":          ("HARDWARE", "ALERT_ENGINEER",  0.95),
-        # Additional codes from keyword heuristics
-        "CARD_READ_SUCCESS":    ("NETWORK",  "NONE",            0.70),
-        "CASH_DISPENSE_OK":     ("NETWORK",  "NONE",            0.70),
     }
 
     category, self_heal, confidence = mapping.get(event_code, ("SERVER", "RESTART_SERVICE", 0.72))
