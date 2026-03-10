@@ -170,37 +170,35 @@ def _recalculate_health_score(source_id, source_type):
     return max(0, round(score))
 
 
+
 # ── Customer notification dispatch ────────────────────────────────────────────
 
 def _dispatch_customer_notifications(incident, atm=None):
     """
     Detect the customer's regional language from the ATM location, pick the
-    matching MessageTemplate, and send a real SMS via Twilio.
+    matching MessageTemplate, and send an SMS via Fast2SMS.
 
     Sends two messages per incident:
       1. Regional language (ta/mr/bn/kn/te/gu/hi) — customer's native tongue
       2. English — universal fallback (skipped when region is already 'en')
 
     A CustomerNotification row is created for each, with status reflecting the
-    actual Twilio response: SENT / FAILED / SKIPPED.
+    actual Fast2SMS response: SENT / FAILED / SKIPPED.
     """
+    import time
     from .models import MessageTemplate, CustomerNotification
-    from .twilio_service import detect_language, send_sms, DEMO_PHONE
+    from .fast2sms_service import detect_language, send_sms, DEMO_PHONE
 
     template_key = TEMPLATE_KEY_MAP.get(incident.rootCauseCategory, 'atm_offline')
 
-    # Detect language from ATM region/location
     regional_lang = detect_language(atm) if atm else 'en'
-
-    # Send regional first, then English (unless region IS English)
     langs_to_send = [regional_lang] if regional_lang == 'en' else [regional_lang, 'en']
 
-    # In demo mode every SMS goes to the configured demo phone.
-    # In production this would be the customer's registered mobile from the transaction.
-    # If DEMO_CUSTOMER_PHONE is not set, send_sms() will SKIPPED gracefully.
     recipient = DEMO_PHONE or ''
 
-    for lang in langs_to_send:
+    for i, lang in enumerate(langs_to_send):
+        if i > 0:
+            time.sleep(2)
         tmpl = MessageTemplate.objects.filter(
             templateKey=template_key, language=lang, channel='SMS',
         ).first()
@@ -208,8 +206,6 @@ def _dispatch_customer_notifications(incident, atm=None):
             continue
 
         msg_text = tmpl.body.replace('{atm_id}', incident.incidentId)
-
-        # --- Actually call Twilio ---
         result = send_sms(recipient, msg_text)
 
         CustomerNotification.objects.create(
@@ -499,10 +495,7 @@ def process_log(log_entry_id):
                 sentAt=timezone.now(),
             )
 
-            # ── STEP 7: Customer Notification (Twilio SMS) ────────────────────────
-            # Only notify customer for incidents that directly impact their transaction
-            # (HIGH/CRITICAL severity + categories visible to end users).
-            # LOW network blips and auto-resolved events don't warrant an SMS.
+            # ── STEP 7: Customer Notification (Fast2SMS) ──────────────────────
             NOTIFY_CATEGORIES = {'CASH_JAM', 'FRAUD', 'HARDWARE', 'NETWORK', 'TIMEOUT'}
             NOTIFY_SEVERITIES  = {'HIGH', 'CRITICAL'}
             should_notify = (

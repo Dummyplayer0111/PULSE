@@ -1,12 +1,10 @@
 """
-PULSE Twilio SMS Service
-========================
+PULSE Fast2SMS Service
+======================
 Reads credentials from environment variables:
 
-    TWILIO_ACCOUNT_SID   — Twilio Account SID (ACxxxxxxxx…)
-    TWILIO_AUTH_TOKEN    — Twilio Auth Token
-    TWILIO_FROM_NUMBER   — Your Twilio phone number in E.164 (+15005550006 for test)
-    DEMO_CUSTOMER_PHONE  — The recipient number for demo SMS (+91XXXXXXXXXX)
+    FAST2SMS_API_KEY     — Fast2SMS API key (from fast2sms.com dashboard)
+    DEMO_CUSTOMER_PHONE  — Recipient 10-digit Indian mobile number (without +91)
 
 If any of these are unset the SMS is skipped gracefully (status='SKIPPED').
 The pipeline continues normally — no crashes, no retries.
@@ -15,16 +13,16 @@ The pipeline continues normally — no crashes, no retries.
 import os
 import logging
 
+import requests
+
 logger = logging.getLogger(__name__)
 
-# ── Credentials ───────────────────────────────────────────────────────────────
-ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '').strip()
-AUTH_TOKEN  = os.environ.get('TWILIO_AUTH_TOKEN',  '').strip()
-FROM_NUMBER = os.environ.get('TWILIO_FROM_NUMBER', '').strip()
-DEMO_PHONE  = os.environ.get('DEMO_CUSTOMER_PHONE','').strip()
+FAST2SMS_API_KEY = os.environ.get('FAST2SMS_API_KEY', '').strip()
+DEMO_PHONE       = os.environ.get('DEMO_CUSTOMER_PHONE', '').strip()
+
+FAST2SMS_URL = 'https://www.fast2sms.com/dev/bulkV2'
 
 # ── Region → language detection ───────────────────────────────────────────────
-# Ordered most-specific first. Matched against ATM.region + ATM.location (uppercased).
 _LANG_MAP = [
     (['TAMIL NADU', 'CHENNAI', 'COIMBATORE', 'MADURAI', 'TRICHY',
       'TIRUCHIRAPPALLI', 'SALEM', 'TIRUNELVELI', 'PONDICHERRY', 'PUDUCHERRY'], 'ta'),
@@ -69,39 +67,66 @@ def detect_language(atm) -> str:
     return 'en'
 
 
-# ── Twilio send ───────────────────────────────────────────────────────────────
-
 def is_configured() -> bool:
-    return bool(ACCOUNT_SID and AUTH_TOKEN and FROM_NUMBER)
+    return bool(FAST2SMS_API_KEY)
+
+
+def _normalize_number(number: str) -> str:
+    """
+    Normalize a single number: strip +91/91 prefix, return 10 digits.
+    Also handles comma-separated lists — normalizes each entry and rejoins.
+    """
+    parts = [p.strip().replace(' ', '') for p in number.split(',') if p.strip()]
+    normalized = []
+    for n in parts:
+        n = n.lstrip('+')
+        if n.startswith('91') and len(n) == 12:
+            n = n[2:]
+        normalized.append(n)
+    return ','.join(normalized)
 
 
 def send_sms(to_number: str, body: str) -> dict:
     """
-    Send an SMS via Twilio REST API.
+    Send an SMS via Fast2SMS bulk API.
 
     Returns:
-        {'status': 'SENT',    'sid':   '<MessageSid>'}
+        {'status': 'SENT',    'request_id': '<id>'}
         {'status': 'FAILED',  'error': '<reason>'}
-        {'status': 'SKIPPED', 'reason':'<why>'}
+        {'status': 'SKIPPED', 'reason': '<why>'}
     """
     if not to_number:
-        logger.warning('[Twilio] DEMO_CUSTOMER_PHONE not set — SMS skipped.')
+        logger.warning('[Fast2SMS] DEMO_CUSTOMER_PHONE not set — SMS skipped.')
         return {'status': 'SKIPPED', 'reason': 'DEMO_CUSTOMER_PHONE not configured'}
 
     if not is_configured():
-        logger.warning(
-            '[Twilio] Credentials missing — SMS skipped. '
-            'Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER.'
-        )
-        return {'status': 'SKIPPED', 'reason': 'Twilio credentials not configured'}
+        logger.warning('[Fast2SMS] FAST2SMS_API_KEY not set — SMS skipped.')
+        return {'status': 'SKIPPED', 'reason': 'Fast2SMS API key not configured'}
+
+    number = _normalize_number(to_number)
 
     try:
-        from twilio.rest import Client
-        client = Client(ACCOUNT_SID, AUTH_TOKEN)
-        msg = client.messages.create(body=body, from_=FROM_NUMBER, to=to_number)
-        logger.info('[Twilio] SMS sent to %s | SID: %s', to_number, msg.sid)
-        return {'status': 'SENT', 'sid': msg.sid}
+        resp = requests.get(
+            FAST2SMS_URL,
+            params={
+                'authorization': FAST2SMS_API_KEY,
+                'route':         'q',
+                'message':       body,
+                'language':      'english',
+                'flash':         0,
+                'numbers':       number,
+            },
+            timeout=10,
+        )
+        data = resp.json()
+        if data.get('return') is True:
+            request_id = data.get('request_id', '')
+            logger.info('[Fast2SMS] SMS sent to %s | request_id: %s', number, request_id)
+            return {'status': 'SENT', 'request_id': request_id}
+        else:
+            logger.error('[Fast2SMS] API error for %s: %s', number, data)
+            return {'status': 'FAILED', 'error': str(data)}
 
     except Exception as exc:
-        logger.error('[Twilio] SMS failed to %s: %s', to_number, exc)
+        logger.error('[Fast2SMS] SMS failed to %s: %s', number, exc)
         return {'status': 'FAILED', 'error': str(exc)}

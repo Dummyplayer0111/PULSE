@@ -80,7 +80,7 @@ const FEATURES = [
   { Icon: Brain,       title: 'AI Root Cause Analysis',    desc: 'scikit-learn classifier identifies failure root cause from raw log text — 94% accuracy across 8 categories in milliseconds.' },
   { Icon: Zap,         title: 'Self-Healing Engine',        desc: 'Automated remediation restarts services, switches networks, reroutes traffic, and freezes compromised ATMs with full audit trails.' },
   { Icon: ShieldAlert, title: 'Anomaly Detection',          desc: 'Z-score statistical analysis flags card skimming, malware patterns, and rapid failure bursts before they escalate to incidents.' },
-  { Icon: Globe,       title: 'Multilingual Alerts',        desc: '8 Indian languages × 5 incident types = 40 templates. Auto-selects customer language. SMS and WhatsApp delivery via Twilio.' },
+  { Icon: Globe,       title: 'Multilingual Alerts',        desc: '8 Indian languages × 5 incident types = 40 templates. Auto-selects customer language. SMS delivery via Fast2SMS.' },
   { Icon: Activity,    title: 'Real-Time WebSocket',        desc: 'Live incident feed and per-ATM log streaming via Django Channels. Sub-second latency updates pushed to every connected dashboard.' },
   { Icon: TrendingUp,  title: 'Predictive Failure Scoring', desc: 'Health trend analysis flags ATMs predicted to fail in the next 24 hours with confidence probability and rate-of-decline metrics.' },
 ];
