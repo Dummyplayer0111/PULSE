@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, AlertCircle, Activity, Zap, Brain, Shield, BarChart2 } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Activity, Zap, Brain, Shield, ShieldAlert, BarChart2 } from 'lucide-react';
 import {
   useGetATMQuery,
   useGetATMLogsQuery,
   useGetATMIncidentsQuery,
   useGetATMHealthHistoryQuery,
   useGetATMTransactionVolumeQuery,
+  useGetAnomalyFlagsQuery,
 } from '../services/payguardApi';
 import { formatDate, formatDateTime } from '../utils';
 import { useWebSocket } from '../hooks/useWebSocket';
 
-const TABS = ['Overview', 'Logs', 'Incidents', 'Health History', 'Self-Heal'] as const;
+const TABS = ['Overview', 'Logs', 'Incidents', 'Anomalies', 'Health History', 'Self-Heal'] as const;
 type Tab = typeof TABS[number];
 
 function sevStyle(s: string) {
@@ -62,6 +63,22 @@ const HEAL_LABELS: Record<string, string> = {
   REROUTE_TRAFFIC: '⇀ Reroute Traffic',
   ALERT_ENGINEER:  '🔔 Alert Engineer',
   FREEZE_ATM:      '🔒 Freeze ATM',
+};
+
+const ANOMALY_COLORS: Record<string, { color: string; bg: string; label: string }> = {
+  UNUSUAL_WITHDRAWAL: { color: '#f59e0b', bg: '#f59e0b1a', label: 'Unusual Withdrawal' },
+  CARD_SKIMMING:      { color: '#ef4444', bg: '#ef44441a', label: 'Card Skimming' },
+  RAPID_FAILURES:     { color: '#f97316', bg: '#f973161a', label: 'Rapid Failures' },
+  MALWARE_PATTERN:    { color: '#dc2626', bg: '#dc26261a', label: 'Malware Pattern' },
+};
+
+const ANOMALY_STATUS_COLORS: Record<string, { color: string; bg: string }> = {
+  FLAGGED:       { color: '#f59e0b', bg: '#f59e0b1a' },
+  ACTIVE:        { color: '#ef4444', bg: '#ef44441a' },
+  CONFIRMED:     { color: '#ef4444', bg: '#ef44441a' },
+  REVIEWED:      { color: '#60a5fa', bg: '#60a5fa1a' },
+  DISMISSED:     { color: '#6b7280', bg: '#6b72801a' },
+  FALSE_POSITIVE:{ color: '#9ca3af', bg: '#9ca3af1a' },
 };
 
 const TH = ({ children }: { children: React.ReactNode }) => (
@@ -390,6 +407,9 @@ export default function ATMDetail() {
   const { data: history = [], isLoading: histLoading  } = useGetATMHealthHistoryQuery(id, {
     skip: tab !== 'Health History',
   });
+  const { data: allAnomalies = [], isLoading: anomLoading } = useGetAnomalyFlagsQuery(undefined, {
+    skip: tab !== 'Anomalies',
+  });
 
   // Always load incidents for overview tab
   const { data: allIncs = [] } = useGetATMIncidentsQuery(id);
@@ -420,6 +440,18 @@ export default function ATMDetail() {
   }, [liveLogs, logs]);
 
   const historyChronological = [...history].reverse() as any[];
+
+  // Filter anomalies for this ATM — sourceId is a UUID, we match against ATM id
+  const atmAnomalies = useMemo(() => {
+    if (!atm) return [];
+    return (allAnomalies as any[]).filter((a: any) => {
+      // sourceId may be the ATM's UUID or serialNumber — check id match
+      const sid = String(a.sourceId ?? '');
+      const atmId = String(atm.id ?? '');
+      const atmSerial = String((atm as any).serialNumber ?? '');
+      return sid === atmId || sid === atmSerial || sid === id;
+    });
+  }, [allAnomalies, atm, id]);
 
   return (
     <div className="p-6 space-y-4" style={{ minHeight: '100vh' }}>
@@ -709,6 +741,97 @@ export default function ATMDetail() {
                     })}
                   </tbody>
                 </table>
+              )
+            )}
+
+            {tab === 'Anomalies' && (
+              anomLoading ? (
+                <div className="p-10 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>Loading...</div>
+              ) : atmAnomalies.length === 0 ? (
+                <div className="p-10 text-center">
+                  <Shield size={32} style={{ color: 'rgba(74,222,128,0.25)', margin: '0 auto 12px' }} />
+                  <p className="text-sm font-semibold text-white">No Anomalies Detected</p>
+                  <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    This ATM has no flagged suspicious activity
+                  </p>
+                </div>
+              ) : (
+                <div className="p-6 space-y-4">
+                  {/* Summary strip */}
+                  <div className="flex items-center gap-5">
+                    {[
+                      { label: 'Total Flags', value: atmAnomalies.length, color: 'rgba(255,255,255,0.6)' },
+                      { label: 'Active', value: atmAnomalies.filter((a: any) => a.status === 'FLAGGED' || a.status === 'ACTIVE').length, color: '#ef4444' },
+                      { label: 'Confirmed', value: atmAnomalies.filter((a: any) => a.status === 'CONFIRMED').length, color: '#f97316' },
+                      { label: 'Dismissed', value: atmAnomalies.filter((a: any) => a.status === 'DISMISSED' || a.status === 'FALSE_POSITIVE').length, color: '#6b7280' },
+                    ].map(({ label, value, color }) => (
+                      <div key={label}>
+                        <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</p>
+                        <p className="text-lg font-bold" style={{ color }}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Anomaly cards */}
+                  <div className="space-y-3">
+                    {atmAnomalies.map((a: any) => {
+                      const aType = ANOMALY_COLORS[a.anomalyType] ?? { color: '#9ca3af', bg: '#9ca3af1a', label: a.anomalyType };
+                      const aStat = ANOMALY_STATUS_COLORS[a.status] ?? { color: '#9ca3af', bg: '#9ca3af1a' };
+                      const confidence = a.confidenceScore != null ? Math.round(a.confidenceScore * 100) : null;
+
+                      return (
+                        <div
+                          key={a.id}
+                          className="rounded-xl p-4"
+                          style={{ background: `${aType.color}08`, border: `1px solid ${aType.color}20` }}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap mb-2">
+                                <ShieldAlert size={13} style={{ color: aType.color }} />
+                                <span className="text-xs font-bold" style={{ color: aType.color }}>{aType.label}</span>
+                                <span
+                                  className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                                  style={{ color: aStat.color, background: aStat.bg }}
+                                >
+                                  {a.status}
+                                </span>
+                              </div>
+
+                              {a.description && (
+                                <p className="text-sm text-white mb-2">{a.description}</p>
+                              )}
+
+                              {/* Confidence bar */}
+                              {confidence != null && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Confidence</span>
+                                  <div className="flex-1 rounded-full overflow-hidden" style={{ height: 4, background: 'var(--p-card-strong)', maxWidth: 120 }}>
+                                    <div className="h-full rounded-full" style={{ width: `${confidence}%`, background: aType.color }} />
+                                  </div>
+                                  <span className="text-xs font-bold" style={{ color: aType.color }}>{confidence}%</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                                {a.createdAt ? formatDateTime(a.createdAt) : '—'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {a.notes && (
+                            <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${aType.color}15` }}>
+                              <p className="text-[10px] uppercase tracking-wider font-medium mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Investigation Notes</p>
+                              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>{a.notes}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )
             )}
 

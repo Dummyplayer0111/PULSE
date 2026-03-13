@@ -16,9 +16,14 @@ from rest_framework.response import Response
 from .models import (
     ATM, Alert, AnomalyFlag, CustomerNotification, HealthSnapshot,
     Incident, LogEntry, MessageTemplate, PaymentChannel, SelfHealAction,
-    Transaction, UserProfile,
+    Transaction, UserProfile, FailedTransaction,
 )
-from .pipeline import _auto_assign_engineer, _broadcast_atm, process_log
+from .pipeline import (
+    _auto_assign_engineer, _broadcast_atm, process_log,
+    update_failed_transaction_status, broadcast_customer_update,
+    TEST_CUSTOMER_PHONE,
+)
+from .customer_views import HELPDESK_NUMBER
 
 channel_layer = get_channel_layer()
 
@@ -153,15 +158,15 @@ _sim_stats  = {
 }
 
 _SIM_EVENTS = [
-    {"code": "CARD_READ_SUCCESS",    "level": "INFO",     "weight": 40},
-    {"code": "CASH_DISPENSE_OK",     "level": "INFO",     "weight": 30},
+    {"code": "CARD_READ_SUCCESS",    "level": "INFO",     "weight": 25},
+    {"code": "CASH_DISPENSE_OK",     "level": "INFO",     "weight": 20},
     {"code": "NETWORK_LATENCY_HIGH", "level": "WARN",     "weight": 10},
-    {"code": "CARD_READ_ERROR",      "level": "ERROR",    "weight": 7},
-    {"code": "CASH_DISPENSE_FAIL",   "level": "ERROR",    "weight": 5},
-    {"code": "NETWORK_TIMEOUT",      "level": "ERROR",    "weight": 4},
-    {"code": "HARDWARE_JAM",         "level": "CRITICAL", "weight": 2},
-    {"code": "MALWARE_SIGNATURE",    "level": "CRITICAL", "weight": 1},
-    {"code": "UPS_FAILURE",          "level": "CRITICAL", "weight": 1},
+    {"code": "CARD_READ_ERROR",      "level": "ERROR",    "weight": 10},
+    {"code": "CASH_DISPENSE_FAIL",   "level": "ERROR",    "weight": 10},
+    {"code": "NETWORK_TIMEOUT",      "level": "ERROR",    "weight": 8},
+    {"code": "HARDWARE_JAM",         "level": "CRITICAL", "weight": 9},
+    {"code": "MALWARE_SIGNATURE",    "level": "CRITICAL", "weight": 5},
+    {"code": "UPS_FAILURE",          "level": "CRITICAL", "weight": 3},
 ]
 _SIM_TOTAL_WEIGHT = sum(e["weight"] for e in _SIM_EVENTS)
 
@@ -197,9 +202,103 @@ def _sim_pick_event():
     return _SIM_EVENTS[0]
 
 
+def _progress_failed_transactions():
+    """
+    Progress FailedTransactions through their lifecycle.
+    Called periodically from the simulator loop.
+    Transitions happen based on age of the transaction.
+    """
+    from datetime import timedelta
+    now = timezone.now()
+
+    # Default flow: CASH_JAM and PARTIAL_DISPENSE (money involved → refund)
+    REFUND_FLOW = [
+        ('DETECTED',             'INVESTIGATING',        timedelta(seconds=30),
+         'Investigation started. Our team is analyzing the issue.',
+         'जांच शुरू हुई। हमारी टीम समस्या का विश्लेषण कर रही है।'),
+        ('INVESTIGATING',        'ENGINEER_DISPATCHED',  timedelta(seconds=60),
+         'Engineer {engineer} dispatched to {atm}. ETA: {eta} minutes.',
+         'इंजीनियर {engineer} को {atm} भेजा गया। अनुमानित समय: {eta} मिनट।'),
+        ('ENGINEER_DISPATCHED',  'RESOLVING',            timedelta(seconds=90),
+         'Engineer {engineer} on-site. Resolving the issue.',
+         'इंजीनियर {engineer} मौके पर। समस्या का समाधान हो रहा है।'),
+        ('RESOLVING',            'REFUND_INITIATED',     timedelta(seconds=120),
+         'ATM restored. Refund of \u20b9{refund} initiated to your bank account.',
+         'ATM बहाल। \u20b9{refund} की वापसी आपके बैंक खाते में शुरू।'),
+        ('REFUND_INITIATED',     'RESOLVED',             timedelta(seconds=150),
+         'Refund of \u20b9{refund} will reflect in your account within 5 working days (RBI T+5 guideline).',
+         '\u20b9{refund} का रिफंड 5 कार्य दिवसों में आपके खाते में आएगा (RBI T+5 नियम)।'),
+    ]
+
+    # NETWORK_TIMEOUT: auto-resolve quickly — usually no debit
+    TIMEOUT_FLOW = [
+        ('DETECTED',       'INVESTIGATING',  timedelta(seconds=20),
+         'Checking transaction status with your bank...',
+         'आपके बैंक से लेनदेन की स्थिति की जाँच हो रही है...'),
+        ('INVESTIGATING',  'RESOLVED',       timedelta(seconds=60),
+         'Verified: Your account was NOT debited. No action needed. Transaction reversed.',
+         'सत्यापित: आपका खाता डेबिट नहीं हुआ। कोई कार्रवाई आवश्यक नहीं। लेनदेन रद्द।'),
+    ]
+
+    # CARD_CAPTURED: no refund, card replacement flow
+    CARD_FLOW = [
+        ('DETECTED',             'INVESTIGATING',        timedelta(seconds=25),
+         'Our team has been notified about the retained card at {atm}.',
+         '{atm} पर रखे गए कार्ड के बारे में हमारी टीम को सूचित किया गया।'),
+        ('INVESTIGATING',        'ENGINEER_DISPATCHED',  timedelta(seconds=55),
+         'Engineer {engineer} dispatched to retrieve your card. ETA: {eta} minutes.',
+         'आपका कार्ड लेने के लिए इंजीनियर {engineer} भेजा गया। अनुमानित समय: {eta} मिनट।'),
+        ('ENGINEER_DISPATCHED',  'RESOLVING',            timedelta(seconds=85),
+         'Engineer on-site. Card will be securely destroyed per RBI norms.',
+         'इंजीनियर मौके पर। RBI नियमों के अनुसार कार्ड सुरक्षित रूप से नष्ट किया जाएगा।'),
+        ('RESOLVING',            'RESOLVED',             timedelta(seconds=115),
+         'Card securely destroyed. Please visit your nearest branch or call your bank to request a new card (5-7 working days).',
+         'कार्ड सुरक्षित रूप से नष्ट। नया कार्ड पाने के लिए अपनी नजदीकी शाखा जाएं या बैंक को कॉल करें (5-7 कार्य दिवस)।'),
+    ]
+
+    active_txns = FailedTransaction.objects.exclude(status='RESOLVED')
+    for ftxn in active_txns:
+        age = now - ftxn.created_at
+
+        if ftxn.failure_type == 'NETWORK_TIMEOUT':
+            flow = TIMEOUT_FLOW
+        elif ftxn.failure_type == 'CARD_CAPTURED':
+            flow = CARD_FLOW
+        else:
+            flow = REFUND_FLOW
+
+        atm_display = ftxn.atm.location if ftxn.atm else 'ATM'
+
+        for from_status, to_status, min_age, msg_en, msg_hi in flow:
+            if ftxn.status == from_status and age >= min_age:
+                msg_en_fmt = msg_en.format(
+                    engineer=ftxn.engineer_name or 'Rajesh K.',
+                    eta=ftxn.engineer_eta_minutes,
+                    refund=f"{ftxn.refund_amount:,.0f}",
+                    atm=atm_display,
+                )
+                msg_hi_fmt = msg_hi.format(
+                    engineer=ftxn.engineer_name or 'Rajesh K.',
+                    eta=ftxn.engineer_eta_minutes,
+                    refund=f"{ftxn.refund_amount:,.0f}",
+                    atm=atm_display,
+                )
+                refund_status = None
+                if to_status == 'REFUND_INITIATED':
+                    refund_status = 'PROCESSING'
+                elif to_status == 'RESOLVED' and ftxn.failure_type in ('CASH_JAM', 'PARTIAL_DISPENSE'):
+                    refund_status = 'COMPLETED'
+                elif to_status == 'RESOLVED':
+                    refund_status = 'NOT_APPLICABLE'
+
+                update_failed_transaction_status(ftxn, to_status, msg_en_fmt, msg_hi_fmt, refund_status)
+                break  # only one transition per tick
+
+
 def _sim_run():
     """Background thread: generate logs and run each through the full pipeline."""
     global _sim_stats
+    tick = 0
     while not _sim_stop.is_set():
         try:
             atms = list(ATM.objects.all())
@@ -245,10 +344,18 @@ def _sim_run():
                 _sim_stats["incidentsCreated"]   = Incident.objects.count()
                 _sim_stats["selfHealsTriggered"] = SelfHealAction.objects.filter(triggeredBy='AUTO').count()
 
+            # Progress failed transactions through lifecycle every few ticks
+            tick += 1
+            if tick % 3 == 0:
+                try:
+                    _progress_failed_transactions()
+                except Exception:
+                    pass
+
         except Exception:
             pass
 
-        time.sleep(random.uniform(2.0, 5.0))
+        time.sleep(random.uniform(1.5, 3.0))
 
     with _sim_lock:
         _sim_stats["running"] = False
@@ -444,6 +551,42 @@ def simulator_status(request):
         return Response(dict(_sim_stats))
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def demo_reset(request):
+    """
+    Clears recent incidents, SMS notifications, anomaly flags, and self-heal
+    actions created by the simulator so the demo starts from a clean slate.
+    Keeps seeded ATMs, logs, and transactions.
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+    cutoff = timezone.now() - timedelta(hours=2)
+    # Only remove records created in the last 2 hours (simulator artifacts)
+    inc_del  = Incident.objects.filter(createdAt__gte=cutoff).delete()[0]
+    sms_del  = CustomerNotification.objects.all().delete()[0]
+    heal_del = SelfHealAction.objects.filter(triggeredBy='AUTO', createdAt__gte=cutoff).delete()[0]
+    alert_del = Alert.objects.filter(createdAt__gte=cutoff).delete()[0]
+    # Clear customer portal data
+    from .models import StatusToken, OTPToken, CustomerSession
+    FailedTransaction.objects.filter(created_at__gte=cutoff).delete()
+    StatusToken.objects.filter(created_at__gte=cutoff).delete()
+    OTPToken.objects.all().delete()
+    CustomerSession.objects.all().delete()
+    # Reset sim stats counter
+    with _sim_lock:
+        _sim_stats["incidentsCreated"]   = Incident.objects.count()
+        _sim_stats["selfHealsTriggered"] = SelfHealAction.objects.filter(triggeredBy='AUTO').count()
+        _sim_stats["logsProcessed"]      = 0
+    return Response({
+        "status": "reset",
+        "incidentsRemoved":   inc_del,
+        "smsCleared":         sms_del,
+        "selfHealsRemoved":   heal_del,
+        "alertsRemoved":      alert_del,
+    })
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def recent_pipeline_events(request):
@@ -620,9 +763,34 @@ def incident_detail(request, id):
 def assign_incident(request, id):
     try:
         incident = Incident.objects.get(id=id)
-        incident.assignedTo = request.data.get('username') or request.data.get('userId')
+        engineer = request.data.get('username') or request.data.get('userId')
+        incident.assignedTo = engineer
         incident.status = 'INVESTIGATING'
         incident.save()
+
+        # Propagate to customer-facing FailedTransactions —
+        # only update engineer name, do NOT regress status.
+        # If txn is already past INVESTIGATING (e.g. RESOLVING), don't move it back.
+        STATUS_RANK = {
+            'DETECTED': 0, 'INVESTIGATING': 1, 'ENGINEER_DISPATCHED': 2,
+            'RESOLVING': 3, 'REFUND_INITIATED': 4, 'RESOLVED': 5,
+        }
+        linked = FailedTransaction.objects.filter(incident=incident).exclude(status='RESOLVED')
+        for ftxn in linked:
+            ftxn.engineer_name = engineer or ftxn.engineer_name
+            ftxn.save(update_fields=['engineer_name'])
+            # Only advance to INVESTIGATING if currently at DETECTED
+            if STATUS_RANK.get(ftxn.status, 0) < STATUS_RANK['INVESTIGATING']:
+                update_failed_transaction_status(
+                    ftxn, 'INVESTIGATING',
+                    f'Engineer {engineer} assigned to your case.',
+                    f'\u0907\u0902\u091c\u0940\u0928\u093f\u092f\u0930 {engineer} \u0906\u092a\u0915\u0947 \u092e\u093e\u092e\u0932\u0947 \u092a\u0930 \u0928\u093f\u092f\u0941\u0915\u094d\u0924\u0964',
+                )
+            else:
+                # Still broadcast the engineer name change
+                from .pipeline import broadcast_customer_update
+                broadcast_customer_update(ftxn.phone_hash, ftxn)
+
         return Response({"assigned": True, "id": id})
     except Incident.DoesNotExist:
         return Response({'error': 'Not found'}, status=404)
@@ -635,6 +803,27 @@ def resolve_incident(request, id):
         incident.status = 'RESOLVED'
         incident.resolvedAt = timezone.now()
         incident.save()
+
+        # Propagate to customer-facing FailedTransactions
+        linked = FailedTransaction.objects.filter(incident=incident).exclude(status='RESOLVED')
+        for ftxn in linked:
+            atm_name = ftxn.atm.location if ftxn.atm else 'ATM'
+            if ftxn.refund_amount > 0:
+                msg_en = f'Issue resolved! ATM {atm_name} restored. Refund of \u20b9{ftxn.refund_amount:,.0f} will reach your account within 5 working days (RBI T+5 guideline).'
+                msg_hi = f'\u0938\u092e\u0938\u094d\u092f\u093e \u0939\u0932! ATM {atm_name} \u092c\u0939\u093e\u0932\u0964 \u20b9{ftxn.refund_amount:,.0f} \u0915\u093e \u0930\u093f\u092b\u0902\u0921 5 \u0915\u093e\u0930\u094d\u092f \u0926\u093f\u0935\u0938\u094b\u0902 \u092e\u0947\u0902 \u0906\u092a\u0915\u0947 \u0916\u093e\u0924\u0947 \u092e\u0947\u0902 \u0906\u090f\u0917\u093e (RBI T+5)\u0964'
+                # Set refund to COMPLETED since the engineer has resolved the issue
+                refund_status = 'COMPLETED'
+            elif ftxn.failure_type == 'CARD_CAPTURED':
+                msg_en = f'Issue resolved! Your card has been securely destroyed per RBI norms. Visit your nearest branch or call {HELPDESK_NUMBER} for a replacement card (5-7 working days).'
+                msg_hi = f'\u0938\u092e\u0938\u094d\u092f\u093e \u0939\u0932! RBI \u0928\u093f\u092f\u092e\u094b\u0902 \u0915\u0947 \u0905\u0928\u0941\u0938\u093e\u0930 \u0915\u093e\u0930\u094d\u0921 \u0938\u0941\u0930\u0915\u094d\u0937\u093f\u0924 \u0930\u0942\u092a \u0938\u0947 \u0928\u0937\u094d\u091f\u0964 \u0928\u092f\u093e \u0915\u093e\u0930\u094d\u0921 \u092a\u093e\u0928\u0947 \u0915\u0947 \u0932\u093f\u090f \u0936\u093e\u0916\u093e \u091c\u093e\u090f\u0902 \u092f\u093e {HELPDESK_NUMBER} \u092a\u0930 \u0915\u0949\u0932 \u0915\u0930\u0947\u0902 (5-7 \u0915\u093e\u0930\u094d\u092f \u0926\u093f\u0935\u0938)\u0964'
+                refund_status = 'NOT_APPLICABLE'
+            else:
+                msg_en = f'Issue resolved! Your account was not debited. No further action needed.'
+                msg_hi = f'\u0938\u092e\u0938\u094d\u092f\u093e \u0939\u0932! \u0906\u092a\u0915\u093e \u0916\u093e\u0924\u093e \u0921\u0947\u092c\u093f\u091f \u0928\u0939\u0940\u0902 \u0939\u0941\u0906\u0964 \u0915\u094b\u0908 \u0914\u0930 \u0915\u093e\u0930\u094d\u0930\u0935\u093e\u0908 \u0906\u0935\u0936\u094d\u092f\u0915 \u0928\u0939\u0940\u0902\u0964'
+                refund_status = 'NOT_APPLICABLE'
+
+            update_failed_transaction_status(ftxn, 'RESOLVED', msg_en, msg_hi, refund_status)
+
         return Response({"resolved": True, "id": id})
     except Incident.DoesNotExist:
         return Response({'error': 'Not found'}, status=404)
@@ -848,9 +1037,13 @@ def self_heal_trigger(request):
         return Response({"error": "incidentId is required"}, status=400)
 
     try:
+        # Accept either a UUID string or a plain integer DB id
         parsed_id = uuid.UUID(str(incident_id))
     except ValueError:
-        return Response({"error": "incidentId must be a valid UUID"}, status=400)
+        try:
+            parsed_id = uuid.UUID(int=int(incident_id))
+        except (ValueError, TypeError):
+            return Response({"error": "incidentId must be a valid UUID or integer"}, status=400)
 
     action = SelfHealAction.objects.create(
         incidentId=parsed_id,

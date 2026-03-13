@@ -36,3 +36,26 @@ class LogConsumer(AsyncWebsocketConsumer):
 
     async def log_entry(self, event):
         await self.send(text_data=json.dumps(event['data']))
+
+
+class CustomerConsumer(AsyncWebsocketConsumer):
+    """
+    WebSocket for real-time customer transaction status updates.
+    Group: customer_{phone_hash}
+    Pushes: transaction_update events when FailedTransaction status changes.
+    """
+
+    async def connect(self):
+        self.phone_hash = self.scope['url_route']['kwargs']['phone_hash']
+        self.group_name = f'customer_{self.phone_hash}'
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.group_name, self.channel_name)
+
+    async def receive(self, text_data):
+        pass  # read-only for customers
+
+    async def transaction_update(self, event):
+        await self.send(text_data=json.dumps(event['data']))

@@ -5,7 +5,7 @@ import type { RootState } from '../store';
 import { clearAuth } from '../store/authSlice';
 import {
   LayoutDashboard, Map, AlertTriangle, Brain,
-  ShieldAlert, MessageSquare, Settings, LogOut, Activity, ScrollText,
+  ShieldAlert, MessageSquare, Settings, LogOut, ScrollText,
   Sun, Moon, Wrench,
 } from 'lucide-react';
 
@@ -88,36 +88,19 @@ export default function Layout() {
           pointerEvents: 'none', zIndex: 10,
         }} />
 
-        {/* Logo */}
+        {/* Wordmark */}
         <div
-          className="px-6 py-4 flex items-center gap-3"
+          className="px-6 py-4 flex items-center justify-between"
           style={{ borderBottom: '1px solid var(--p-sidebar-border)' }}
         >
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-            style={{
-              background: 'linear-gradient(135deg, var(--p-logo-bg1), var(--p-logo-bg2))',
-              border: '1px solid var(--p-logo-border)',
-              boxShadow: 'inset 0 1px 0 rgba(196,151,70,0.20), 0 0 12px rgba(196,151,70,0.08)',
-            }}
-          >
-            <Activity size={15} style={{ color: '#e8af48' }} />
-          </div>
-          <div>
-            <p className="text-sm font-bold tracking-tight leading-none" style={{ color: '#feeaa5', textShadow: '0 0 12px rgba(196,151,70,0.4)' }}>PayGuard</p>
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ animation: 'pulse 2s infinite' }} />
-              <span className="text-[9px] uppercase tracking-widest font-medium" style={{ color: 'var(--p-sidebar-label)' }}>
-                Live
-              </span>
-            </div>
-          </div>
+          <p className="text-sm font-black tracking-tight" style={{ color: '#feeaa5', letterSpacing: '-0.02em', textShadow: '0 0 12px rgba(196,151,70,0.3)' }}>
+            PayGuard
+          </p>
           {/* Theme toggle */}
           <button
             onClick={toggle}
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             style={{
-              marginLeft: 'auto',
               background: 'var(--p-toggle-bg)',
               border: '1px solid var(--p-toggle-border)',
               borderRadius: '8px',
@@ -186,22 +169,11 @@ export default function Layout() {
 
         {/* Footer */}
         <div className="px-3 py-4" style={{ borderTop: '1px solid var(--p-sidebar-border)' }}>
-          {/* User pill */}
-          <div
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1"
-            style={{
-              background: 'var(--p-user-pill)',
-              border: '1px solid var(--p-user-pill-border)',
-              boxShadow: 'inset 0 1px 0 rgba(196,151,70,0.08)',
-            }}
-          >
+          {/* User row */}
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1" style={{ background: 'var(--p-user-pill)', border: '1px solid var(--p-user-pill-border)' }}>
             <div
               className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold"
-              style={{
-                color: '#feeaa5',
-                background: 'linear-gradient(135deg, var(--p-logo-bg1), var(--p-logo-bg2))',
-                border: '1px solid var(--p-logo-border)',
-              }}
+              style={{ color: '#feeaa5', background: 'linear-gradient(135deg, var(--p-logo-bg1), var(--p-logo-bg2))', border: '1px solid var(--p-logo-border)' }}
             >
               {(auth.username || 'A')[0].toUpperCase()}
             </div>
@@ -213,12 +185,6 @@ export default function Layout() {
                 {auth.role || 'Operations'}
               </p>
             </div>
-            <span
-              className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
-              style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399' }}
-            >
-              Online
-            </span>
           </div>
 
           {/* Logout */}

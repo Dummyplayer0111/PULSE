@@ -16,6 +16,7 @@ import Communications      from './src/pages/Communications';
 import Settings            from './src/pages/Settings';
 import Logs                from './src/pages/Logs';
 import EngineerDashboard   from './src/pages/EngineerDashboard';
+import CustomerPortal      from './src/pages/CustomerPortal';
 import { Brain, Zap, ShieldAlert, Globe, Activity, TrendingUp, ArrowRight, ChevronRight, Home, LogIn } from 'lucide-react';
 
 // ─── GLOW CARD (Stripe-style hover) ──────────────────────────────────────────
@@ -979,8 +980,15 @@ function LoginRibbons() {
   );
 }
 
+const ROLE_PRESETS: Record<string, { username: string; password: string; desc: string; color: string }> = {
+  ADMIN:    { username: 'admin',    password: 'Admin@1234',    desc: 'Full system access — dashboard, settings, user management', color: '#e8af48' },
+  ENGINEER: { username: 'engineer', password: 'Engineer@1234', desc: 'Incident response, ATM troubleshooting, field operations', color: '#60a5fa' },
+  VIEWER:   { username: 'viewer',   password: 'Viewer@1234',   desc: 'Read-only monitoring — dashboard, maps, reports',           color: '#4ade80' },
+};
+
 function LoginPage() {
   const [form, setForm]         = useState({ username:'', password:'' });
+  const [selectedRole, setSelectedRole] = useState<string>('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
@@ -989,6 +997,14 @@ function LoginPage() {
   const [locked, setLocked]     = useState(false);
   const navigate  = useNavigate();
   const dispatch  = useDispatch();
+
+  const selectRole = (role: string) => {
+    const preset = ROLE_PRESETS[role];
+    if (!preset) return;
+    setSelectedRole(role);
+    setForm({ username: preset.username, password: preset.password });
+    setError('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1157,9 +1173,35 @@ function LoginPage() {
             <div style={{ padding:'clamp(1.5rem,2.5vw,2rem)' }}>
 
               {/* Form header */}
-              <div style={{ marginBottom:'2rem' }}>
+              <div style={{ marginBottom:'1.4rem' }}>
                 <h2 className="font-bold" style={{ fontSize:'clamp(1.4rem,2.2vw,1.8rem)', marginBottom:'0.4rem', letterSpacing:'-0.02em', color:'#feeaa5' }}>Sign in to your account</h2>
-                <p style={{ color:'rgba(196,151,70,0.5)', fontSize:'0.92rem' }}>Enter your credentials to continue</p>
+                <p style={{ color:'rgba(196,151,70,0.5)', fontSize:'0.92rem' }}>Select your role and sign in to continue</p>
+              </div>
+
+              {/* Role selector */}
+              <div style={{ marginBottom:'1.2rem' }}>
+                <label style={{ display:'block', color:'rgba(196,151,70,0.6)', fontSize:'0.82rem', fontWeight:600, marginBottom:'0.6rem', letterSpacing:'0.04em', textTransform:'uppercase' }}>Role</label>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'0.5rem' }}>
+                  {Object.entries(ROLE_PRESETS).map(([role, { desc, color }]) => (
+                    <button key={role} type="button" onClick={() => selectRole(role)}
+                      style={{
+                        background: selectedRole === role ? `${color}12` : 'rgba(196,151,70,0.03)',
+                        border: selectedRole === role ? `1.5px solid ${color}55` : '1px solid rgba(196,151,70,0.12)',
+                        borderRadius: 12, padding: '0.7rem 0.5rem', cursor: 'pointer',
+                        transition: 'all 0.25s cubic-bezier(0.16,1,0.3,1)',
+                        boxShadow: selectedRole === role ? `0 0 12px ${color}18` : 'none',
+                      }}
+                      onMouseEnter={e => { if (selectedRole !== role) { e.currentTarget.style.background = 'rgba(196,151,70,0.06)'; e.currentTarget.style.borderColor = 'rgba(196,151,70,0.25)'; }}}
+                      onMouseLeave={e => { if (selectedRole !== role) { e.currentTarget.style.background = 'rgba(196,151,70,0.03)'; e.currentTarget.style.borderColor = 'rgba(196,151,70,0.12)'; }}}
+                    >
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginBottom:4 }}>
+                        {selectedRole === role && <div style={{ width:6, height:6, borderRadius:'50%', background: color, boxShadow:`0 0 6px ${color}` }} />}
+                        <span style={{ fontSize:'0.78rem', fontWeight:700, color: selectedRole === role ? color : 'rgba(196,151,70,0.55)', letterSpacing:'0.05em' }}>{role}</span>
+                      </div>
+                      <p style={{ fontSize:'0.62rem', color:'rgba(196,151,70,0.35)', lineHeight:1.3, margin:0 }}>{desc.split(' — ')[0]}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:'1.1rem' }}>
@@ -1250,6 +1292,8 @@ function App() {
         <Routes>
           <Route path="/"      element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/customer" element={<CustomerPortal />} />
+          <Route path="/customer/status/:token" element={<CustomerPortal />} />
           <Route element={<Layout />}>
             <Route path="/dashboard"      element={<Dashboard />} />
             <Route path="/engineer"       element={<EngineerDashboard />} />

@@ -159,11 +159,11 @@ export const payguardApi = createApi({
     resetAtmHealth:     builder.mutation<any, number>({ query: (id) => ({ url: `atms/${id}/reset-health/`, method: 'POST' }), invalidatesTags: ['ATMs'] }),
 
     // ── TRANSACTIONS ──────────────────────────────────────────
-    getTransactions: builder.query<any[], { flagged?: boolean; limit?: number } | void>({
+    getTransactions: builder.query<any[], { flagged?: boolean; limit?: number } | undefined>({
       query: (params) => {
         const p = new URLSearchParams();
-        if (params?.flagged) p.set('flagged', 'true');
-        if (params?.limit)   p.set('limit', String(params.limit));
+        if (params && params.flagged) p.set('flagged', 'true');
+        if (params && params.limit)   p.set('limit', String(params.limit));
         const qs = p.toString();
         return qs ? `transactions/?${qs}` : 'transactions/';
       },

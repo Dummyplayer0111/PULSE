@@ -279,6 +279,7 @@ function TransactionFraudSection() {
     { flagged: true, limit: 50 },
     { pollingInterval: 5000 },
   );
+  const [selectedTxn, setSelectedTxn] = useState<any>(null);
 
   const uniqueCards  = new Set((txns as any[]).map((t: any) => t.cardHash)).size;
   const totalBlocked = (txns as any[]).reduce((s: number, t: any) => s + (t.amount || 0), 0);
@@ -353,7 +354,8 @@ function TransactionFraudSection() {
                 return (
                   <tr
                     key={t.id}
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer' }}
+                    onClick={() => setSelectedTxn(t)}
                     onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--p-card-hover)'}
                     onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
                   >
@@ -403,6 +405,83 @@ function TransactionFraudSection() {
           </table>
         )}
       </div>
+
+      {/* ── Transaction Detail Modal ─────────────────────────────────── */}
+      <Modal isOpen={!!selectedTxn} onClose={() => setSelectedTxn(null)} title="Fraud Transaction Detail" size="sm">
+        {selectedTxn && (() => {
+          const t         = selectedTxn;
+          const conf      = t.fraudConfidence ?? 0;
+          const threat    = getThreatLevel(conf);
+          const typeColor = ANOMALY_TYPE_COLORS[t.fraudType] ?? '#f59e0b';
+          const typeIcon  = ANOMALY_TYPE_ICONS[t.fraudType]  ?? '⚠️';
+          return (
+            <div className="space-y-4">
+
+              {/* Fraud type + reason */}
+              <div className="rounded-xl p-4 space-y-3" style={{ background: `${typeColor}0a`, border: `1px solid ${typeColor}25` }}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{typeIcon}</span>
+                  <span className="text-sm font-bold" style={{ color: typeColor }}>
+                    {(t.fraudType ?? 'Unknown').replace(/_/g, ' ')}
+                  </span>
+                  <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full font-semibold" style={{ color: threat.color, background: `${threat.color}18` }}>
+                    {threat.label}
+                  </span>
+                </div>
+
+                {t.fraudDescription && (
+                  <div className="rounded-lg px-3 py-2.5" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Detection Reason</p>
+                    <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.75)' }}>{t.fraudDescription}</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg px-2.5 py-2 text-center" style={{ background: 'rgba(0,0,0,0.2)' }}>
+                    <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Confidence</p>
+                    <p className="text-sm font-bold mt-0.5" style={{ color: threat.color }}>{Math.round(conf * 100)}%</p>
+                  </div>
+                  <div className="rounded-lg px-2.5 py-2 text-center" style={{ background: 'rgba(0,0,0,0.2)' }}>
+                    <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Status</p>
+                    <p className="text-xs font-bold mt-0.5" style={{ color: 'rgba(255,255,255,0.7)' }}>{t.status}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transaction details */}
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                {[
+                  ['ATM',      t.atm__name ?? `ATM-${t.atm_id ?? '?'}`],
+                  ['Location', t.atm__location ?? '—'],
+                  ['Card',     `****${(t.cardHash ?? '????').slice(-4)}`],
+                  ['Amount',   `₹${Number(t.amount).toLocaleString('en-IN')}`],
+                  ['Type',     t.transactionType ?? 'WITHDRAWAL'],
+                  ['Time',     formatDate(t.timestamp)],
+                ].map(([label, value], i, arr) => (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between px-4 py-2.5"
+                    style={{ borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}
+                  >
+                    <span className="text-[11px] font-semibold" style={{ color: 'rgba(255,255,255,0.35)' }}>{label}</span>
+                    <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.8)' }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setSelectedTxn(null)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium"
+                  style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
     </div>
   );
 }
@@ -414,7 +493,7 @@ export default function Anomaly() {
   const [confirmFlag, { isLoading: confirming }] = useConfirmAnomalyFlagMutation();
 
   const [staFilter,  setStaFilter]  = useState('All');
-  const [editId,     setEditId]     = useState<any>(null);
+  const [editFlag,   setEditFlag]   = useState<any>(null);
   const [newStatus,  setNewStatus]  = useState('REVIEWED');
   const [notes,      setNotes]      = useState('');
 
@@ -423,10 +502,9 @@ export default function Anomaly() {
   }, [flags, staFilter]);
 
   const handleUpdate = async (status?: string) => {
-    const id = editId;
-    if (!id) return;
-    await updateFlag({ id, body: { status: status ?? newStatus, notes } });
-    setEditId(null);
+    if (!editFlag) return;
+    await updateFlag({ id: editFlag.id, body: { status: status ?? newStatus, notes } });
+    setEditFlag(null);
     setNotes('');
   };
 
@@ -435,7 +513,7 @@ export default function Anomaly() {
   };
 
   const openEdit = (flag: any) => {
-    setEditId(flag.id);
+    setEditFlag(flag);
     setNewStatus(flag.status || 'REVIEWED');
     setNotes(flag.notes || '');
   };
@@ -634,72 +712,129 @@ export default function Anomaly() {
       </div>
 
       {/* Update Modal */}
-      <Modal isOpen={!!editId} onClose={() => setEditId(null)} title="Review Anomaly Flag" size="sm">
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              New Status
-            </label>
-            <select
-              value={newStatus}
-              onChange={e => setNewStatus(e.target.value)}
-              className="w-full px-3 py-2.5"
-              style={{ ...inputStyle, cursor: 'pointer' }}
-            >
-              {UPDATE_STATUSES.map(s => (
-                <option key={s} value={s} style={{ background: '#1a1a22' }}>{s.replace('_', ' ')}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              Investigation Notes
-            </label>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2.5 resize-none"
-              style={inputStyle}
-              placeholder="Add investigation notes…"
-            />
-          </div>
-          {/* Quick action buttons */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={async () => { await confirmFlag(editId); setEditId(null); setNotes(''); }}
-              disabled={confirming}
-              className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-40"
-              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}
-            >
-              <AlertTriangle size={11} /> {confirming ? 'Opening…' : 'Confirm Threat'}
-            </button>
-            <button
-              onClick={() => handleUpdate('FALSE_POSITIVE')}
-              className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all"
-              style={{ background: 'rgba(107,114,128,0.1)', border: '1px solid rgba(107,114,128,0.2)', color: '#9ca3af' }}
-            >
-              <CheckCircle size={11} /> False Positive
-            </button>
-          </div>
-          <div className="flex gap-2 justify-end pt-1">
-            <button
-              onClick={() => setEditId(null)}
-              className="px-4 py-2 rounded-xl text-sm font-medium"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => handleUpdate()}
-              disabled={updating}
-              className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'rgba(255,255,255,0.9)', color: '#0b0b0f' }}
-            >
-              {updating ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        </div>
+      <Modal isOpen={!!editFlag} onClose={() => setEditFlag(null)} title="Review Anomaly Flag" size="sm">
+        {editFlag && (() => {
+          const ef = editFlag;
+          const typeColor = ANOMALY_TYPE_COLORS[ef.anomalyType] ?? '#f59e0b';
+          const typeIcon  = ANOMALY_TYPE_ICONS[ef.anomalyType]  ?? '⚠️';
+          const conf      = ef.confidenceScore ?? 0;
+          const threat    = getThreatLevel(conf);
+          const st        = staStyle(ef.status);
+          return (
+            <div className="space-y-4">
+
+              {/* ── Detection Summary ─────────────────────────── */}
+              <div className="rounded-xl p-4 space-y-3" style={{ background: `${typeColor}0a`, border: `1px solid ${typeColor}25` }}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xl">{typeIcon}</span>
+                  <span className="text-sm font-bold" style={{ color: typeColor }}>
+                    {(ef.anomalyType ?? '—').replace(/_/g, ' ')}
+                  </span>
+                  <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full font-semibold" style={{ color: st.color, background: st.bg }}>
+                    {ef.status}
+                  </span>
+                </div>
+
+                {/* Reason / description */}
+                {ef.description && (
+                  <div className="rounded-lg px-3 py-2.5" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Detection Reason</p>
+                    <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.75)' }}>{ef.description}</p>
+                  </div>
+                )}
+
+                {/* Confidence + metadata row */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg px-2.5 py-2 text-center" style={{ background: 'rgba(0,0,0,0.2)' }}>
+                    <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Confidence</p>
+                    <p className="text-sm font-bold mt-0.5" style={{ color: threat.color }}>{Math.round(conf * 100)}%</p>
+                  </div>
+                  <div className="rounded-lg px-2.5 py-2 text-center" style={{ background: 'rgba(0,0,0,0.2)' }}>
+                    <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Threat</p>
+                    <p className="text-sm font-bold mt-0.5" style={{ color: threat.color }}>{threat.label}</p>
+                  </div>
+                  <div className="rounded-lg px-2.5 py-2 text-center" style={{ background: 'rgba(0,0,0,0.2)' }}>
+                    <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Source</p>
+                    <p className="text-xs font-bold mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.7)' }}>{ef.sourceType ?? 'ATM'}</p>
+                  </div>
+                </div>
+
+                {/* Detected at */}
+                <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                  Detected · {formatDate(ef.createdAt)}
+                </p>
+              </div>
+
+              {/* ── Update Status ─────────────────────────────── */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  Update Status
+                </label>
+                <select
+                  value={newStatus}
+                  onChange={e => setNewStatus(e.target.value)}
+                  className="w-full px-3 py-2.5"
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                >
+                  {UPDATE_STATUSES.map(s => (
+                    <option key={s} value={s} style={{ background: '#1a1a22' }}>{s.replace('_', ' ')}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  Investigation Notes
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2.5 resize-none"
+                  style={inputStyle}
+                  placeholder="Add investigation notes…"
+                />
+              </div>
+
+              {/* Quick actions */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={async () => { await confirmFlag(ef.id); setEditFlag(null); setNotes(''); }}
+                  disabled={confirming}
+                  className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-40"
+                  style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}
+                >
+                  <AlertTriangle size={11} /> {confirming ? 'Opening…' : 'Confirm Threat'}
+                </button>
+                <button
+                  onClick={() => handleUpdate('FALSE_POSITIVE')}
+                  className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all"
+                  style={{ background: 'rgba(107,114,128,0.1)', border: '1px solid rgba(107,114,128,0.2)', color: '#9ca3af' }}
+                >
+                  <CheckCircle size={11} /> False Positive
+                </button>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-1">
+                <button
+                  onClick={() => setEditFlag(null)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleUpdate()}
+                  disabled={updating}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-40"
+                  style={{ background: 'rgba(255,255,255,0.9)', color: '#0b0b0f' }}
+                >
+                  {updating ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
     </div>
   );

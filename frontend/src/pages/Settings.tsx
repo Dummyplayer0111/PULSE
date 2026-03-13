@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   Settings as SettingsIcon, Copy, Check, AlertCircle, CheckCircle,
   Activity, Shield, Zap, Brain, Sliders, ToggleLeft, ToggleRight, Save,
-  Play, Square, Radio, Sun, Moon,
+  Play, Square, Radio, Sun, Moon, Users, UserCircle,
 } from 'lucide-react';
 import {
   useGetChannelsQuery,
+  useGetEngineersQuery,
   useGetSimulatorStatusQuery,
   useStartSimulatorMutation,
   useStopSimulatorMutation,
@@ -391,6 +392,98 @@ function AIConfigPanel() {
   );
 }
 
+// ─── User Management Panel ────────────────────────────────────────────────────
+
+const STATIC_USERS = [
+  { username: 'admin', fullName: 'System Administrator', role: 'ADMIN' },
+  { username: 'viewer', fullName: 'Read-Only Viewer', role: 'VIEWER' },
+];
+
+const ROLE_COLORS: Record<string, { color: string; bg: string }> = {
+  ADMIN:    { color: '#e8af48', bg: 'rgba(232,175,72,0.12)' },
+  ENGINEER: { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)' },
+  VIEWER:   { color: '#4ade80', bg: 'rgba(74,222,128,0.12)' },
+};
+
+function UserManagementPanel() {
+  const { data: engineers = [], isLoading } = useGetEngineersQuery();
+
+  const allUsers = [
+    ...STATIC_USERS,
+    ...engineers.map((e: any) => ({ username: e.username, fullName: e.fullName || e.username, role: 'ENGINEER' })),
+  ];
+
+  return (
+    <Panel title="User Management" subtitle="Registered users and role assignments" icon={Users} iconColor="#a78bfa">
+      {isLoading ? (
+        <div className="py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>Loading...</div>
+      ) : (
+        <div className="space-y-0">
+          {/* Header */}
+          <div className="grid grid-cols-12 gap-3 pb-3" style={{ borderBottom: '1px solid var(--p-card-border)' }}>
+            {['User', 'Full Name', 'Role', 'Status'].map((h, i) => (
+              <div key={h} className={i === 0 ? 'col-span-3' : i === 1 ? 'col-span-4' : 'col-span-2'}>
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.28)' }}>{h}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Rows */}
+          {allUsers.map((u: any) => {
+            const rc = ROLE_COLORS[u.role] ?? ROLE_COLORS.VIEWER;
+            return (
+              <div
+                key={u.username}
+                className="grid grid-cols-12 gap-3 py-3 items-center transition-colors"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--p-card-hover)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <div className="col-span-3 flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: rc.bg, border: `1px solid ${rc.color}25` }}>
+                    <UserCircle size={14} style={{ color: rc.color }} />
+                  </div>
+                  <span className="text-sm font-mono text-white">{u.username}</span>
+                </div>
+                <div className="col-span-4">
+                  <span className="text-sm text-white">{u.fullName}</span>
+                </div>
+                <div className="col-span-2">
+                  <span
+                    className="text-[11px] px-2.5 py-1 rounded-full font-bold"
+                    style={{ color: rc.color, background: rc.bg }}
+                  >
+                    {u.role}
+                  </span>
+                </div>
+                <div className="col-span-2 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#4ade80', boxShadow: '0 0 4px #4ade80' }} />
+                  <span className="text-xs" style={{ color: '#4ade80' }}>Active</span>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Footer summary */}
+          <div className="flex items-center gap-5 pt-4 mt-2">
+            {[
+              { label: 'Total Users', value: allUsers.length, color: 'rgba(255,255,255,0.6)' },
+              { label: 'Admins', value: allUsers.filter((u: any) => u.role === 'ADMIN').length, color: '#e8af48' },
+              { label: 'Engineers', value: allUsers.filter((u: any) => u.role === 'ENGINEER').length, color: '#60a5fa' },
+              { label: 'Viewers', value: allUsers.filter((u: any) => u.role === 'VIEWER').length, color: '#4ade80' },
+            ].map(({ label, value, color }) => (
+              <div key={label}>
+                <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</p>
+                <p className="text-lg font-bold" style={{ color }}>{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 // ─── Main Settings Page ────────────────────────────────────────────────────────
 
 export default function Settings() {
@@ -449,6 +542,9 @@ export default function Settings() {
           </button>
         </div>
       </Panel>
+
+      {/* User Management */}
+      <UserManagementPanel />
 
       {/* Simulator */}
       <SimulatorPanel />

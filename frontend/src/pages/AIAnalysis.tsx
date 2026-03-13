@@ -230,14 +230,23 @@ function DetailPanel({ ev, onClose }: { ev: PipelineEvent; onClose: () => void }
           </div>
           <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{cl.detail}</p>
         </div>
-      ) : (
-        <div
-          className="rounded-xl p-3 text-xs"
-          style={{ background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.15)', color: '#4ade80' }}
-        >
-          ✓ Informational log — no failure detected, no incident created
-        </div>
-      )}
+      ) : (() => {
+        const lvl = ev.log.logLevel;
+        const isFailure = lvl === 'CRITICAL' || lvl === 'ERROR';
+        return (
+          <div
+            className="rounded-xl p-3 text-xs"
+            style={isFailure
+              ? { background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }
+              : { background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.15)', color: '#4ade80' }
+            }
+          >
+            {isFailure
+              ? '⚠ AI classifier unavailable — no incident auto-created. Manual review recommended.'
+              : '✓ Informational log — no failure detected, no incident created'}
+          </div>
+        );
+      })()}
 
       {/* Self-Heal */}
       {cl && (

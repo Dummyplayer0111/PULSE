@@ -1,8 +1,5 @@
 import React from 'react';
-import {
-  AlertTriangle, Activity, ShieldAlert, Brain, Zap, TrendingUp,
-  Wifi, WifiOff, Server, CheckCircle2, XCircle, AlertCircle,
-} from 'lucide-react';
+import { AlertTriangle, Brain, ShieldAlert, CheckCircle2, AlertCircle } from 'lucide-react';
 import {
   useGetDashboardSummaryQuery,
   useGetIncidentsQuery,
@@ -17,169 +14,149 @@ import { usePipelineSocket } from '../hooks/usePipelineSocket';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 
-/* ── helpers ─────────────────────────────────────────────────────────── */
-function sev(s: string) {
-  return ({ CRITICAL: '#ef4444', HIGH: '#f97316', MEDIUM: '#f59e0b', LOW: '#22c55e' } as any)[s] ?? '#6b7280';
+/* ── colour helpers ──────────────────────────────────────────────────── */
+function sevColor(s: string) {
+  return ({ CRITICAL: '#ef4444', HIGH: '#f97316', MEDIUM: '#eab308', LOW: '#22c55e' } as any)[s] ?? '#6b7280';
 }
-function sta(s: string) {
+function staColor(s: string) {
   return ({
-    OPEN: '#60a5fa', RESOLVED: '#4ade80', ACTIVE: '#60a5fa',
-    ACKNOWLEDGED: '#a78bfa', AUTO_RESOLVED: '#4ade80',
-    FAILED: '#ef4444', SUCCESS: '#4ade80',
-    PENDING: '#9ca3af', REVIEWED: '#4ade80', DISMISSED: '#6b7280',
-  } as any)[s] ?? '#9ca3af';
+    OPEN: '#60a5fa', INVESTIGATING: '#f97316', ESCALATED: '#ef4444',
+    RESOLVED: '#22c55e', AUTO_RESOLVED: '#22c55e', SUCCESS: '#22c55e',
+    FAILED: '#ef4444', PENDING: '#6b7280', ACTIVE: '#60a5fa',
+  } as any)[s] ?? '#6b7280';
 }
 
-/* ── KPI Card ─────────────────────────────────────────────────────────── */
-function KPICard({ label, value, Icon, color, sub }: {
-  label: string; value: string | number; Icon: any; color: string; sub?: string;
-}) {
+/* ── Divider ─────────────────────────────────────────────────────────── */
+const Div = () => <div style={{ height: 1, background: 'var(--p-card-border)', margin: '0' }} />;
+
+/* ── Section Header ──────────────────────────────────────────────────── */
+function SectionHead({ title, right }: { title: string; right?: React.ReactNode }) {
   return (
-    <div className="rounded-2xl p-4 relative overflow-hidden" style={{
-      background: 'var(--p-card)',
-      border: '1px solid var(--p-card-border)',
-    }}>
-      <div className="absolute inset-x-0 top-0" style={{ height: '1px', background: `linear-gradient(90deg,transparent,${color}55,transparent)` }} />
-      <div className="flex items-center justify-between mb-3">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${color}16`, border: `1px solid ${color}28` }}>
-          <Icon size={16} style={{ color }} />
-        </div>
-        {sub && <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ color, background: `${color}15` }}>{sub}</span>}
-      </div>
-      <p className="text-2xl font-bold text-white leading-none">{value}</p>
-      <p className="text-xs mt-1 font-medium" style={{ color: 'var(--p-text-dim)' }}>{label}</p>
+    <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--p-card-border)' }}>
+      <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--p-text-dim)', letterSpacing: '0.1em' }}>{title}</span>
+      {right && <span style={{ color: 'var(--p-text-dim)' }}>{right}</span>}
     </div>
   );
 }
 
-/* ── Health Gauge ─────────────────────────────────────────────────────── */
-function HealthGauge({ score }: { score: number }) {
-  const clamped = Math.max(0, Math.min(100, score));
-  const color = clamped >= 80 ? '#4ade80' : clamped >= 60 ? '#f59e0b' : '#ef4444';
-  const deg = (clamped / 100) * 360;
+/* ── Card shell ──────────────────────────────────────────────────────── */
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="relative" style={{ width: 100, height: 100 }}>
-        <div className="absolute inset-0 rounded-full" style={{ background: `conic-gradient(${color} ${deg}deg, rgba(255,255,255,0.06) ${deg}deg)` }} />
-        <div className="absolute rounded-full flex flex-col items-center justify-center" style={{ inset: 7, background: 'var(--p-gauge-inner)' }}>
-          <span className="text-xl font-bold" style={{ color }}>{clamped}</span>
-          <span className="text-[9px]" style={{ color: 'rgba(255,255,255,0.3)' }}>/ 100</span>
-        </div>
-      </div>
-      <div className="text-center">
-        <p className="text-sm font-bold text-white">Platform Health</p>
-        <p className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
-          {clamped >= 80 ? 'All systems nominal' : clamped >= 60 ? 'Degraded performance' : 'Critical — action needed'}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/* ── Panel ────────────────────────────────────────────────────────────── */
-function Panel({ title, children, headerRight }: { title: string; children: React.ReactNode; headerRight?: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}>
-      <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--p-card-border)' }}>
-        <h3 className="text-sm font-semibold text-white">{title}</h3>
-        {headerRight}
-      </div>
+    <div className={`rounded-xl overflow-hidden ${className}`} style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}>
       {children}
     </div>
   );
 }
 
-/* ── Live Feed Row ────────────────────────────────────────────────────── */
-function LiveEventRow({ ev }: { ev: any }) {
-  const color = ev.incident
-    ? (({ CRITICAL: '#ef4444', HIGH: '#f97316', MEDIUM: '#f59e0b', LOW: '#22c55e' } as any)[ev.incident?.severity] ?? '#6b7280')
-    : '#4ade80';
+/* ── Metric strip (replaces KPI cards) ───────────────────────────────── */
+function MetricStrip({ metrics }: { metrics: { label: string; value: string | number; color?: string; note?: string }[] }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-      <span className="text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0" style={{ color, background: `${color}1a`, border: `1px solid ${color}30` }}>
-        {ev.log?.logLevel ?? 'INFO'}
-      </span>
-      <span className="text-[11px] font-mono shrink-0" style={{ color: 'rgba(255,255,255,0.5)' }}>
-        {ev.log?.eventCode ?? '—'}
-      </span>
-      <span className="text-[10px] flex-1 truncate" style={{ color: ev.incident ? color : 'rgba(255,255,255,0.28)' }}>
-        {ev.incident ? `→ ${ev.incident.incidentId}` : 'OK'}
-      </span>
-      <span className="text-[9px] shrink-0" style={{ color: 'rgba(255,255,255,0.22)' }}>
-        {new Date(ev.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-      </span>
+    <Card>
+      <div className="grid" style={{ gridTemplateColumns: `repeat(${metrics.length}, 1fr)` }}>
+        {metrics.map((m, i) => (
+          <div
+            key={i}
+            className="px-5 py-4"
+            style={{
+              borderRight: i < metrics.length - 1 ? '1px solid var(--p-card-border)' : 'none',
+              borderTop: `2px solid ${m.color ?? 'rgba(255,255,255,0.08)'}`,
+            }}
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--p-text-dim)', letterSpacing: '0.09em' }}>
+              {m.label}
+            </p>
+            <p className="text-2xl font-bold leading-none" style={{ color: m.color ?? 'var(--p-text)', fontVariantNumeric: 'tabular-nums' }}>
+              {m.value}
+            </p>
+            {m.note && <p className="text-[10px] mt-1.5" style={{ color: 'var(--p-text-dim)' }}>{m.note}</p>}
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/* ── Fleet status bar ────────────────────────────────────────────────── */
+function FleetBar({ online, degraded, offline, total }: { online: number; degraded: number; offline: number; total: number }) {
+  const pct = (n: number) => total > 0 ? `${((n / total) * 100).toFixed(0)}%` : '0%';
+  return (
+    <div>
+      {/* Segmented bar */}
+      <div className="flex rounded-full overflow-hidden mb-3" style={{ height: 6, background: 'rgba(255,255,255,0.06)' }}>
+        {online   > 0 && <div style={{ width: pct(online),   background: '#22c55e', transition: 'width 0.5s' }} />}
+        {degraded > 0 && <div style={{ width: pct(degraded), background: '#eab308', transition: 'width 0.5s' }} />}
+        {offline  > 0 && <div style={{ width: pct(offline),  background: '#ef4444', transition: 'width 0.5s' }} />}
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Online',   value: online,   color: '#22c55e' },
+          { label: 'Degraded', value: degraded, color: '#eab308' },
+          { label: 'Offline',  value: offline,  color: '#ef4444' },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="rounded-lg px-3 py-2.5 text-center" style={{ background: `${color}0c`, border: `1px solid ${color}20` }}>
+            <p className="text-lg font-bold leading-none" style={{ color, fontVariantNumeric: 'tabular-nums' }}>{value}</p>
+            <p className="text-[10px] mt-1 font-medium uppercase tracking-wider" style={{ color: 'var(--p-text-dim)' }}>{label}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-/* ── Skeleton ─────────────────────────────────────────────────────────── */
-function Skeleton({ h = 'h-4' }: { h?: string }) {
-  return <div className={`${h} rounded-lg animate-pulse`} style={{ background: 'var(--p-card-strong)' }} />;
-}
-
-/* ── Root Cause Donut ────────────────────────────────────────────────── */
+/* ── Donut chart ─────────────────────────────────────────────────────── */
 const RC_COLORS: Record<string, string> = {
-  NETWORK:  '#60a5fa',
-  HARDWARE: '#f97316',
-  CASH_JAM: '#f59e0b',
-  FRAUD:    '#ef4444',
-  SERVER:   '#a78bfa',
-  TIMEOUT:  '#fb923c',
-  SWITCH:   '#34d399',
-  UNKNOWN:  '#6b7280',
+  NETWORK: '#60a5fa', HARDWARE: '#f97316', CASH_JAM: '#eab308',
+  FRAUD: '#ef4444', SERVER: '#a78bfa', TIMEOUT: '#fb923c',
+  SWITCH: '#34d399', UNKNOWN: '#6b7280',
 };
 
-function DashboardDonut({ stats }: { stats: any[] }) {
-  const SIZE = 140, CX = 70, CY = 70, R = 52, INNER = 32;
+function RootCauseDonut({ stats }: { stats: any[] }) {
+  const SIZE = 120, CX = 60, CY = 60, R = 46, INNER = 28;
   const total = stats.reduce((a: number, s: any) => a + (s.count ?? 0), 0);
 
   if (!stats.length || total === 0) {
     return (
-      <div className="p-8 text-center">
-        <AlertCircle size={26} style={{ color: 'rgba(255,255,255,0.1)', margin: '0 auto 8px' }} />
-        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>Stats build from incidents. Ingest logs to populate.</p>
+      <div className="p-6 text-center">
+        <AlertCircle size={20} style={{ color: 'rgba(255,255,255,0.1)', margin: '0 auto 6px' }} />
+        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>No incidents yet</p>
       </div>
     );
   }
 
   let angle = -Math.PI / 2;
   const arcs = stats.map((s: any, i: number) => {
-    const color = RC_COLORS[s.category] ?? `hsl(${i * 45},65%,58%)`;
+    const color = RC_COLORS[s.category] ?? `hsl(${i * 45},55%,55%)`;
     const sweep = ((s.count ?? 0) / total) * 2 * Math.PI;
-    const x1 = CX + R * Math.cos(angle);
-    const y1 = CY + R * Math.sin(angle);
+    const x1 = CX + R * Math.cos(angle), y1 = CY + R * Math.sin(angle);
     angle += sweep;
-    const x2 = CX + R * Math.cos(angle);
-    const y2 = CY + R * Math.sin(angle);
-    const large = sweep > Math.PI ? 1 : 0;
-    const path = `M ${CX} ${CY} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${R} ${R} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
-    return { path, color, pct: Math.round(((s.count ?? 0) / total) * 100), category: s.category, count: s.count };
+    const x2 = CX + R * Math.cos(angle), y2 = CY + R * Math.sin(angle);
+    return {
+      path: `M ${CX} ${CY} L ${x1.toFixed(1)} ${y1.toFixed(1)} A ${R} ${R} 0 ${sweep > Math.PI ? 1 : 0} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z`,
+      color, pct: Math.round(((s.count ?? 0) / total) * 100),
+      category: s.category, count: s.count,
+    };
   });
 
   return (
-    <div className="flex items-center gap-4 px-4 py-3">
-      {/* Donut SVG */}
+    <div className="flex items-center gap-5 px-5 py-4">
       <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ flexShrink: 0 }}>
-        {arcs.map((a, i) => (
-          <path key={i} d={a.path} fill={a.color} stroke="rgba(0,0,0,0.25)" strokeWidth="1.5" />
-        ))}
+        {arcs.map((a, i) => <path key={i} d={a.path} fill={a.color} stroke="var(--p-card)" strokeWidth="1.5" />)}
         <circle cx={CX} cy={CY} r={INNER} fill="var(--p-gauge-inner)" />
-        <text x={CX} y={CY - 4} textAnchor="middle" fill="white" fontSize="17" fontWeight="700" fontFamily="inherit">{total}</text>
-        <text x={CX} y={CY + 11} textAnchor="middle" fill="rgba(255,255,255,0.38)" fontSize="8.5" fontFamily="inherit">incidents</text>
+        <text x={CX} y={CY - 2} textAnchor="middle" fill="var(--p-text)" fontSize="15" fontWeight="700" fontFamily="inherit">{total}</text>
+        <text x={CX} y={CY + 11} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize="7.5" fontFamily="inherit">total</text>
       </svg>
-      {/* Legend */}
       <div className="flex-1 space-y-1.5">
-        {stats.slice(0, 7).map((s: any, i: number) => {
-          const color = RC_COLORS[s.category] ?? `hsl(${i * 45},65%,58%)`;
-          const pct   = total > 0 ? Math.round(((s.count ?? 0) / total) * 100) : 0;
+        {stats.slice(0, 6).map((s: any, i: number) => {
+          const color = RC_COLORS[s.category] ?? `hsl(${i * 45},55%,55%)`;
+          const pct = total > 0 ? Math.round(((s.count ?? 0) / total) * 100) : 0;
           return (
             <div key={i} className="flex items-center gap-2">
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0, display: 'inline-block' }} />
-              <span className="text-[10px] text-white flex-1 truncate font-medium">{s.category || 'UNKNOWN'}</span>
-              <div style={{ width: 36, height: 3, borderRadius: 2, background: 'var(--p-card-strong)', overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.6s ease' }} />
+              <span style={{ width: 6, height: 6, borderRadius: 1, background: color, flexShrink: 0, display: 'inline-block' }} />
+              <span className="text-[11px] flex-1 truncate" style={{ color: 'var(--p-text-dim)' }}>{s.category}</span>
+              <div style={{ width: 48, height: 2, borderRadius: 1, background: 'var(--p-card-strong)', overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 1 }} />
               </div>
-              <span className="text-[10px] w-7 text-right" style={{ color: 'rgba(255,255,255,0.4)' }}>{pct}%</span>
+              <span className="text-[10px] w-6 text-right tabular-nums" style={{ color: 'var(--p-text-dim)' }}>{pct}%</span>
             </div>
           );
         })}
@@ -188,272 +165,326 @@ function DashboardDonut({ stats }: { stats: any[] }) {
   );
 }
 
-/* ── main page ───────────────────────────────────────────────────────── */
+/* ── Live event row ──────────────────────────────────────────────────── */
+function EventRow({ ev }: { ev: any }) {
+  const hasInc = !!ev.incident;
+  const color  = hasInc ? sevColor(ev.incident?.severity) : 'var(--p-text-dim)';
+  const lvl    = ev.log?.logLevel ?? 'INFO';
+  const lvlColor: Record<string, string> = { CRITICAL: '#ef4444', ERROR: '#f97316', WARN: '#eab308', INFO: '#6b7280' };
+
+  return (
+    <div className="grid px-5 py-2" style={{ gridTemplateColumns: '44px 1fr 1fr auto', gap: '0 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center' }}>
+      <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: lvlColor[lvl] ?? '#6b7280' }}>{lvl}</span>
+      <span className="text-[11px] font-mono truncate" style={{ color: 'var(--p-text-dim)' }}>{ev.log?.eventCode ?? '—'}</span>
+      <span className="text-[11px] truncate" style={{ color: hasInc ? color : 'rgba(255,255,255,0.2)' }}>
+        {hasInc ? ev.incident.incidentId : '—'}
+      </span>
+      <span className="text-[10px] tabular-nums" style={{ color: 'rgba(255,255,255,0.2)', whiteSpace: 'nowrap' }}>
+        {new Date(ev.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+      </span>
+    </div>
+  );
+}
+
+/* ── Skeleton ────────────────────────────────────────────────────────── */
+function Skel({ h = 'h-4' }: { h?: string }) {
+  return <div className={`${h} rounded animate-pulse`} style={{ background: 'var(--p-card-strong)' }} />;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MAIN PAGE
+═══════════════════════════════════════════════════════════════════════ */
 export default function Dashboard() {
-  const { data: summary                               } = useGetDashboardSummaryQuery(undefined, { pollingInterval: 5000 });
+  const { data: summary }                              = useGetDashboardSummaryQuery(undefined, { pollingInterval: 5000 });
   const { data: incidents = [], isLoading: incLoading } = useGetIncidentsQuery(undefined, { pollingInterval: 5000 });
-  const { data: anomalies = []                        } = useGetAnomalyFlagsQuery();
-  const { data: actions   = [], isLoading: shLoading  } = useGetSelfHealActionsQuery();
-  const { data: preds                                 } = useGetAIPredictionsQuery();
-  const { data: rcStats                               } = useGetRootCauseStatsQuery();
-  const { data: channels  = []                        } = useGetChannelsQuery();
+  const { data: anomalies = [] }                       = useGetAnomalyFlagsQuery();
+  const { data: actions   = [], isLoading: shLoading }  = useGetSelfHealActionsQuery();
+  const { data: preds }                                = useGetAIPredictionsQuery();
+  const { data: rcStats }                              = useGetRootCauseStatsQuery();
+  const { data: channels = [] }                        = useGetChannelsQuery();
 
   const { status: wsStatus } = usePipelineSocket();
   const pipelineEvents = useSelector((s: RootState) => s.pipeline.events);
 
-  const openInc   = summary?.activeIncidents ?? incidents.filter((i: any) => i.status !== 'RESOLVED' && i.status !== 'AUTO_RESOLVED').length;
-  const critical  = incidents.filter((i: any) => i.severity === 'CRITICAL').length;
-  const activeAno = anomalies.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FLAGGED').length;
-  const predList  = preds?.predictions ?? [];
-  const statsList = rcStats?.stats ?? [];
-
+  const openInc        = summary?.activeIncidents ?? incidents.filter((i: any) => i.status !== 'RESOLVED' && i.status !== 'AUTO_RESOLVED').length;
+  const critical       = incidents.filter((i: any) => i.severity === 'CRITICAL').length;
+  const activeAno      = anomalies.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FLAGGED').length;
+  const predList       = preds?.predictions ?? [];
+  const statsList      = rcStats?.stats ?? [];
   const atmCounts      = summary?.atms ?? { online: 0, offline: 0, degraded: 0, total: 0 };
   const platformHealth = Math.round(summary?.platformHealth ?? 100);
   const upiRate        = summary?.upiSuccessRate ?? 100;
-  const recentEvents   = pipelineEvents.slice(0, 12);
+  const recentEvents   = pipelineEvents.slice(0, 14);
+  const now            = new Date().toLocaleString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   return (
     <div className="p-5 space-y-4" style={{ minHeight: '100vh' }}>
 
-      {/* Anomaly Banner */}
+      {/* ── Critical alert banner ────────────────────────────────────── */}
       {activeAno > 0 && (
-        <div className="rounded-xl px-4 py-2.5 flex items-center gap-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)' }}>
-          <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse shrink-0" />
-          <AlertTriangle size={13} style={{ color: '#ef4444' }} />
-          <span className="text-sm font-semibold" style={{ color: '#ef4444' }}>
+        <div className="rounded-lg px-4 py-2.5 flex items-center gap-3" style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)' }}>
+          <AlertTriangle size={12} style={{ color: '#ef4444', flexShrink: 0 }} />
+          <span className="text-xs font-semibold" style={{ color: '#ef4444' }}>
             {activeAno} active anomal{activeAno === 1 ? 'y' : 'ies'} — Z-score engine flagged suspicious activity
           </span>
-          <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(239,68,68,0.2)', color: '#ef4444' }}>ALERT</span>
+          <span className="ml-auto text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(239,68,68,0.7)' }}>Alert</span>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      {/* ── Page header ─────────────────────────────────────────────── */}
+      <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-white">Operations Center</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--p-heading-dim)' }}>PayGuard real-time ATM & payment monitoring</p>
+          <h1 className="text-lg font-bold leading-none" style={{ color: 'var(--p-text)', letterSpacing: '-0.02em' }}>Operations Center</h1>
+          <p className="text-[11px] mt-1" style={{ color: 'var(--p-text-dim)' }}>ATM & payment infrastructure — real-time</p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* WS status */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}>
-            {wsStatus === 'connected'
-              ? <><Wifi size={11} style={{ color: '#4ade80' }} /><span className="text-[10px] font-medium" style={{ color: '#4ade80' }}>Live</span></>
-              : <><WifiOff size={11} style={{ color: '#6b7280' }} /><span className="text-[10px]" style={{ color: '#6b7280' }}>Connecting…</span></>}
+        <div className="flex items-center gap-3">
+          {/* WS indicator */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--p-text-dim)' }}>Feed</span>
+            <span
+              className="text-[10px] font-semibold"
+              style={{ color: wsStatus === 'connected' ? '#22c55e' : '#6b7280' }}
+            >
+              {wsStatus === 'connected' ? 'Live' : 'Connecting'}
+            </span>
           </div>
-          {/* Fleet quick stats */}
-          <div className="flex items-center gap-3 px-4 py-1.5 rounded-xl" style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}>
-            <Server size={11} style={{ color: 'rgba(255,255,255,0.4)' }} />
-            <span className="text-xs font-semibold text-white">{atmCounts.total} ATMs</span>
-            <div className="w-px h-3" style={{ background: 'var(--p-card-border)' }} />
-            {[
-              { count: atmCounts.online,   color: '#4ade80', label: 'up' },
-              { count: atmCounts.degraded, color: '#f59e0b', label: 'deg' },
-              { count: atmCounts.offline,  color: '#ef4444', label: 'dn' },
-            ].map(({ count, color, label }) => (
-              <div key={label} className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-                <span className="text-xs font-bold" style={{ color }}>{count}</span>
-                <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</span>
-              </div>
-            ))}
-            <div className="w-px h-3" style={{ background: 'var(--p-card-border)' }} />
-            <span className="text-xs font-bold" style={{ color: upiRate >= 95 ? '#4ade80' : '#f59e0b' }}>{upiRate}%</span>
-            <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>UPI</span>
-          </div>
+          <span style={{ width: 1, height: 14, background: 'var(--p-card-border)', display: 'inline-block' }} />
+          {/* Timestamp */}
+          <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>{now}</span>
         </div>
       </div>
 
-      {/* Payment Channel pills */}
+      {/* ── Metric strip ─────────────────────────────────────────────── */}
+      <MetricStrip metrics={[
+        { label: 'Open Incidents',   value: incLoading ? '—' : openInc,   color: openInc > 0 ? '#ef4444' : '#22c55e',   note: 'requires attention' },
+        { label: 'Critical Alerts',  value: incLoading ? '—' : critical,  color: critical > 0 ? '#f97316' : '#6b7280',   note: 'severity: critical' },
+        { label: 'Active Anomalies', value: activeAno,                    color: activeAno > 0 ? '#eab308' : '#6b7280',  note: 'flagged by Z-score' },
+        { label: 'AI Predictions',   value: predList.length,              color: predList.length > 0 ? '#a78bfa' : '#6b7280', note: 'at-risk ATMs' },
+        { label: 'Platform Health',  value: `${platformHealth}%`,         color: platformHealth >= 80 ? '#22c55e' : platformHealth >= 60 ? '#eab308' : '#ef4444', note: 'avg. ATM score' },
+        { label: 'UPI Success Rate', value: `${upiRate}%`,                color: upiRate >= 95 ? '#22c55e' : '#eab308', note: 'payment channels' },
+      ]} />
+
+      {/* ── Payment channels ─────────────────────────────────────────── */}
       {(channels as any[]).length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {(channels as any[]).map((ch: any) => {
-            const ok = ch.status === 'ONLINE' || ch.status === 'ACTIVE';
-            return (
-              <div key={ch.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{ background: ok ? 'rgba(74,222,128,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${ok ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.2)'}` }}>
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: ok ? '#4ade80' : '#ef4444' }} />
-                <span className="text-xs font-semibold" style={{ color: ok ? '#4ade80' : '#ef4444' }}>{ch.name}</span>
-                <span className="text-[10px]" style={{ color: 'var(--p-heading-muted)' }}>{ch.type}</span>
-              </div>
-            );
-          })}
-        </div>
+        <Card>
+          <SectionHead title="Payment Channels" right={
+            <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>{(channels as any[]).filter((c: any) => c.status === 'ONLINE').length}/{(channels as any[]).length} online</span>
+          } />
+          <div className="px-5 py-3 flex flex-wrap gap-x-6 gap-y-2">
+            {(channels as any[]).map((ch: any) => {
+              const ok = ch.status === 'ONLINE' || ch.status === 'ACTIVE';
+              return (
+                <div key={ch.id} className="flex items-center gap-2">
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: ok ? '#22c55e' : '#ef4444', flexShrink: 0, display: 'inline-block' }} />
+                  <span className="text-[11px] font-medium" style={{ color: ok ? 'var(--p-text)' : 'rgba(255,255,255,0.4)' }}>{ch.name}</span>
+                  <span className="text-[10px]" style={{ color: 'var(--p-text-dim)' }}>{ch.type}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
       )}
 
-      {/* KPI row — 2 cols on sm, 4 cols on lg+ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KPICard label="Open Incidents"   value={incLoading ? '—' : openInc}   Icon={AlertTriangle} color="#ef4444" sub="active" />
-        <KPICard label="Critical Alerts"  value={incLoading ? '—' : critical}  Icon={Activity}      color="#f97316" sub="urgent" />
-        <KPICard label="Active Anomalies" value={activeAno}                    Icon={ShieldAlert}   color="#f59e0b" sub="flagged" />
-        <KPICard label="AI Predictions"   value={predList.length}              Icon={Brain}         color="#a78bfa" sub="pending" />
-      </div>
-
-      {/* 3-column row — stacks to 1 col below lg */}
+      {/* ── 3-column row ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-        {/* System Health */}
-        <Panel title="System Health">
-          <div className="p-5 flex flex-col items-center gap-4">
-            <HealthGauge score={platformHealth} />
-            <div className="w-full grid grid-cols-3 gap-2">
-              {[
-                { label: 'Online',   value: atmCounts.online,   color: '#4ade80' },
-                { label: 'Degraded', value: atmCounts.degraded, color: '#f59e0b' },
-                { label: 'Offline',  value: atmCounts.offline,  color: '#ef4444' },
-              ].map(({ label, value, color }) => (
-                <div key={label} className="rounded-xl p-2 text-center" style={{ background: `${color}0d`, border: `1px solid ${color}1a` }}>
-                  <p className="text-base font-bold" style={{ color }}>{value}</p>
-                  <p className="text-[9px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</p>
-                </div>
-              ))}
-            </div>
+        {/* Fleet Health */}
+        <Card>
+          <SectionHead title="Fleet Health" right={
+            <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>{atmCounts.total} terminals</span>
+          } />
+          <div className="p-5">
+            <FleetBar
+              online={atmCounts.online}
+              degraded={atmCounts.degraded}
+              offline={atmCounts.offline}
+              total={atmCounts.total}
+            />
           </div>
-        </Panel>
+        </Card>
 
         {/* Live Pipeline Feed */}
-        <Panel
-          title="Live Pipeline Feed"
-          headerRight={
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: wsStatus === 'connected' ? '#4ade80' : '#6b7280', animation: wsStatus === 'connected' ? 'pulse 2s infinite' : 'none' }} />
-              <span className="text-[10px]" style={{ color: 'var(--p-text-dim)' }}>{recentEvents.length} events</span>
-            </div>
-          }
-        >
-          {recentEvents.length === 0 ? (
-            <div className="p-8 text-center">
-              <Activity size={22} style={{ color: 'rgba(255,255,255,0.1)', margin: '0 auto 8px' }} />
-              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>No events yet — start the simulator</p>
-            </div>
-          ) : (
-            <div className="overflow-y-auto" style={{ maxHeight: 230 }}>
-              {recentEvents.map((ev: any, i: number) => <LiveEventRow key={`${ev.log?.id}-${i}`} ev={ev} />)}
+        <Card>
+          <SectionHead title="Live Pipeline Feed" right={
+            <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>{recentEvents.length} events</span>
+          } />
+          {/* Column headers */}
+          {recentEvents.length > 0 && (
+            <div className="grid px-5 py-1.5" style={{ gridTemplateColumns: '44px 1fr 1fr auto', gap: '0 12px', borderBottom: '1px solid var(--p-card-border)' }}>
+              {['Level', 'Event', 'Incident', 'Time'].map(h => (
+                <span key={h} className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>{h}</span>
+              ))}
             </div>
           )}
-        </Panel>
-
-        {/* Self-Heal Actions */}
-        <Panel title="Self-Heal Actions">
-          {shLoading ? (
-            <div className="p-5 space-y-3">
-              {[1,2,3].map(i => <Skeleton key={i} h="h-10" />)}
-            </div>
-          ) : (actions as any[]).length === 0 ? (
-            <div className="p-8 text-center">
-              <Zap size={22} style={{ color: 'rgba(255,255,255,0.1)', margin: '0 auto 8px' }} />
-              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>No actions yet.</p>
+          {recentEvents.length === 0 ? (
+            <div className="px-5 py-8 text-center">
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>No events — start the simulator</p>
             </div>
           ) : (
-            <div className="overflow-y-auto" style={{ maxHeight: 230 }}>
+            <div className="overflow-y-auto" style={{ maxHeight: 224 }}>
+              {recentEvents.map((ev: any, i: number) => <EventRow key={`${ev.log?.id}-${i}`} ev={ev} />)}
+            </div>
+          )}
+        </Card>
+
+        {/* Self-Heal Log */}
+        <Card>
+          <SectionHead title="Self-Heal Log" right={
+            <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>{(actions as any[]).length} actions</span>
+          } />
+          {shLoading ? (
+            <div className="p-5 space-y-2">{[1,2,3].map(i => <Skel key={i} h="h-8" />)}</div>
+          ) : (actions as any[]).length === 0 ? (
+            <div className="px-5 py-8 text-center">
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>No actions yet</p>
+            </div>
+          ) : (
+            <div className="overflow-y-auto" style={{ maxHeight: 224 }}>
               {(actions as any[]).slice(0, 10).map((a: any) => (
-                <div key={a.id} className="px-4 py-2.5 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: `${sta(a.status)}1a`, border: `1px solid ${sta(a.status)}35` }}>
-                    <Zap size={10} style={{ color: sta(a.status) }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-white truncate">{a.action_type || a.actionType || 'Action'}</p>
-                    <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{formatDate(a.created_at || a.createdAt)}</p>
-                  </div>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-medium" style={{ color: sta(a.status), background: `${sta(a.status)}1a` }}>
-                    {a.status || '—'}
+                <div key={a.id} className="grid px-5 py-2.5" style={{ gridTemplateColumns: '1fr auto auto', gap: '0 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center' }}>
+                  <span className="text-[11px] truncate font-medium" style={{ color: 'var(--p-text)' }}>
+                    {(a.action_type || a.actionType || '—').replace(/_/g, ' ')}
+                  </span>
+                  <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>
+                    {formatDate(a.created_at || a.createdAt)}
+                  </span>
+                  <span className="text-[10px] font-semibold uppercase" style={{ color: staColor(a.status), letterSpacing: '0.04em' }}>
+                    {a.status}
                   </span>
                 </div>
               ))}
             </div>
           )}
-        </Panel>
+        </Card>
       </div>
 
-      {/* Recent Incidents table */}
-      <Panel title="Recent Incidents" headerRight={
-        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'var(--p-card-strong)', color: 'var(--p-text-dim)' }}>
-          Last {Math.min((incidents as any[]).length, 8)}
-        </span>
-      }>
+      {/* ── Incidents table ───────────────────────────────────────────── */}
+      <Card>
+        <SectionHead title="Recent Incidents" right={
+          <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>
+            {Math.min((incidents as any[]).length, 8)} of {(incidents as any[]).length}
+          </span>
+        } />
         {incLoading ? (
-          <div className="p-5 space-y-3">{[1,2,3,4].map(i => <Skeleton key={i} h="h-9" />)}</div>
+          <div className="p-5 space-y-2">{[1,2,3,4].map(i => <Skel key={i} h="h-9" />)}</div>
         ) : (incidents as any[]).length === 0 ? (
           <div className="p-10 text-center">
-            <CheckCircle2 size={28} style={{ color: 'rgba(255,255,255,0.1)', margin: '0 auto 8px' }} />
-            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No incidents recorded yet.</p>
+            <CheckCircle2 size={22} style={{ color: 'rgba(255,255,255,0.08)', margin: '0 auto 8px' }} />
+            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.2)' }}>No incidents recorded.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <tr style={{ borderBottom: '1px solid var(--p-card-border)' }}>
                   {['ID', 'Title', 'Root Cause', 'Confidence', 'Severity', 'Status', 'Created'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.28)' }}>{h}</th>
+                    <th key={h} className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.22)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {(incidents as any[]).slice(0, 8).map((inc: any) => (
-                  <tr key={inc.id} className="transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--p-card-hover)'}
-                    onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}>
-                    <td className="px-4 py-3 text-xs font-mono" style={{ color: 'var(--p-text-muted)' }}>{String(inc.incidentId || inc.id).slice(0, 12)}</td>
-                    <td className="px-4 py-3 text-sm text-white" style={{ maxWidth: 160 }}><span className="truncate block">{inc.title || '—'}</span></td>
-                    <td className="px-4 py-3 text-xs font-semibold" style={{ color: 'var(--p-text-dim)' }}>{inc.rootCauseCategory || '—'}</td>
-                    <td className="px-4 py-3">
+                  <tr
+                    key={inc.id}
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--p-card-hover)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                  >
+                    <td className="px-5 py-3 font-mono text-[11px]" style={{ color: 'var(--p-text-dim)', whiteSpace: 'nowrap' }}>
+                      {String(inc.incidentId || inc.id).slice(0, 14)}
+                    </td>
+                    <td className="px-5 py-3 text-sm" style={{ color: 'var(--p-text)', maxWidth: 180 }}>
+                      <span className="truncate block">{inc.title || '—'}</span>
+                    </td>
+                    <td className="px-5 py-3 text-[11px] font-medium" style={{ color: 'var(--p-text-dim)', whiteSpace: 'nowrap' }}>
+                      {inc.rootCauseCategory || '—'}
+                    </td>
+                    <td className="px-5 py-3">
                       {inc.aiConfidence != null && (
                         <div className="flex items-center gap-2">
-                          <div className="rounded-full overflow-hidden" style={{ width: 40, height: 3, background: 'rgba(255,255,255,0.07)' }}>
-                            <div className="h-full rounded-full" style={{ width: `${Math.round(inc.aiConfidence * 100)}%`, background: '#a78bfa' }} />
+                          <div className="rounded-sm overflow-hidden" style={{ width: 44, height: 2, background: 'rgba(255,255,255,0.07)' }}>
+                            <div style={{ width: `${Math.round(inc.aiConfidence * 100)}%`, height: '100%', background: '#a78bfa' }} />
                           </div>
-                          <span className="text-[11px] font-semibold" style={{ color: '#a78bfa' }}>{Math.round(inc.aiConfidence * 100)}%</span>
+                          <span className="text-[11px] tabular-nums font-semibold" style={{ color: '#a78bfa' }}>
+                            {Math.round(inc.aiConfidence * 100)}%
+                          </span>
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold" style={{ color: sev(inc.severity), background: `${sev(inc.severity)}1a` }}>{inc.severity}</span>
+                    <td className="px-5 py-3">
+                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: sevColor(inc.severity) }}>
+                        {inc.severity}
+                      </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold" style={{ color: sta(inc.status), background: `${sta(inc.status)}1a` }}>{inc.status}</span>
+                    <td className="px-5 py-3">
+                      <span
+                        className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-sm"
+                        style={{ color: staColor(inc.status), background: `${staColor(inc.status)}12`, border: `1px solid ${staColor(inc.status)}25` }}
+                      >
+                        {inc.status.replace('_', ' ')}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 text-xs" style={{ color: 'var(--p-text-dim)' }}>{formatDate(inc.createdAt)}</td>
+                    <td className="px-5 py-3 text-[11px] tabular-nums" style={{ color: 'var(--p-text-dim)', whiteSpace: 'nowrap' }}>
+                      {formatDate(inc.createdAt)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-      </Panel>
+      </Card>
 
-      {/* AI Predictions + Root Cause — 2 cols on lg+ */}
+      {/* ── AI Predictions + Root Cause ───────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* AI Failure Predictions */}
-        <Panel title="AI Failure Predictions">
+        <Card>
+          <SectionHead title="AI Failure Predictions" right={
+            <span className="text-[10px]" style={{ color: '#a78bfa' }}>{predList.length} at-risk</span>
+          } />
           {predList.length === 0 ? (
-            <div className="p-8 text-center space-y-2">
-              <Brain size={26} style={{ color: 'rgba(255,255,255,0.1)', margin: '0 auto' }} />
-              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>No predictions yet — feed more logs to the AI engine.</p>
+            <div className="px-5 py-8 text-center">
+              <Brain size={20} style={{ color: 'rgba(255,255,255,0.08)', margin: '0 auto 6px' }} />
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>Feed more health data to generate predictions</p>
             </div>
-          ) : predList.slice(0, 5).map((p: any, i: number) => (
-            <div key={i} className="px-5 py-3.5 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.2)' }}>
-                <TrendingUp size={13} style={{ color: '#a78bfa' }} />
+          ) : (
+            <>
+              {/* Column headers */}
+              <div className="grid px-5 py-2" style={{ gridTemplateColumns: '1fr 80px 60px', borderBottom: '1px solid var(--p-card-border)' }}>
+                {['ATM', 'Horizon', 'Probability'].map(h => (
+                  <span key={h} className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>{h}</span>
+                ))}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">{p.atmName || p.atm_id || p.atmId || `ATM-${i + 1}`}</p>
-                <p className="text-xs mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.38)' }}>
-                  {p.weakestComponent || p.failureCategory || 'Unknown'} · {p.predictedIn || 'within 24h'}
-                </p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-sm font-bold" style={{ color: '#a78bfa' }}>{formatConfidence(p.failureProbability ?? p.probability ?? p.confidence)}</p>
-                <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>confidence</p>
-              </div>
-            </div>
-          ))}
-        </Panel>
+              {predList.slice(0, 6).map((p: any, i: number) => {
+                const prob = p.failureProbability ?? p.probability ?? p.confidence ?? 0;
+                const color = prob >= 0.8 ? '#ef4444' : prob >= 0.5 ? '#f97316' : '#eab308';
+                return (
+                  <div key={i} className="grid px-5 py-2.5" style={{ gridTemplateColumns: '1fr 80px 60px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center' }}>
+                    <div>
+                      <p className="text-[12px] font-semibold" style={{ color: 'var(--p-text)' }}>
+                        {p.atmName || `ATM-${i + 1}`}
+                      </p>
+                      <p className="text-[10px]" style={{ color: 'var(--p-text-dim)' }}>
+                        {p.weakestComponent || p.failureCategory || 'Unknown component'}
+                      </p>
+                    </div>
+                    <span className="text-[11px]" style={{ color: 'var(--p-text-dim)' }}>{p.predictedIn || '< 24h'}</span>
+                    <span className="text-[12px] font-bold tabular-nums" style={{ color }}>{formatConfidence(prob)}</span>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </Card>
 
         {/* Root Cause Distribution */}
-        <Panel title="Root Cause Distribution">
-          <DashboardDonut stats={statsList} />
-        </Panel>
-      </div>
+        <Card>
+          <SectionHead title="Root Cause Distribution" />
+          <RootCauseDonut stats={statsList} />
+        </Card>
 
+      </div>
     </div>
   );
 }

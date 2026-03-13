@@ -1,5 +1,7 @@
 from django.db import models
 import uuid
+import hashlib
+import secrets
 from django.utils import timezone
 from django.contrib.auth.models import User
 
@@ -429,3 +431,108 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.username} ({self.role})"
+
+
+# ─────────────────────────────────────────────
+# FAILED TRANSACTION (Customer-Facing)
+# ─────────────────────────────────────────────
+
+FAILED_TXN_STATUS_CHOICES = [
+    ("DETECTED", "DETECTED"),
+    ("INVESTIGATING", "INVESTIGATING"),
+    ("ENGINEER_DISPATCHED", "ENGINEER_DISPATCHED"),
+    ("RESOLVING", "RESOLVING"),
+    ("REFUND_INITIATED", "REFUND_INITIATED"),
+    ("RESOLVED", "RESOLVED"),
+]
+
+REFUND_STATUS_CHOICES = [
+    ("PENDING", "PENDING"),
+    ("PROCESSING", "PROCESSING"),
+    ("COMPLETED", "COMPLETED"),
+    ("NOT_APPLICABLE", "NOT_APPLICABLE"),
+]
+
+FAILURE_TYPE_CHOICES = [
+    ("CASH_JAM", "CASH_JAM"),
+    ("PARTIAL_DISPENSE", "PARTIAL_DISPENSE"),
+    ("NETWORK_TIMEOUT", "NETWORK_TIMEOUT"),
+    ("CARD_CAPTURED", "CARD_CAPTURED"),
+]
+
+
+class FailedTransaction(models.Model):
+    transaction_ref    = models.CharField(max_length=50, unique=True)
+    phone_hash         = models.CharField(max_length=64, db_index=True)
+    phone_last_four    = models.CharField(max_length=4)
+    card_last_four     = models.CharField(max_length=4)
+    amount             = models.FloatField()
+    amount_dispensed   = models.FloatField(default=0)
+    refund_amount      = models.FloatField(default=0)
+    atm                = models.ForeignKey('ATM', on_delete=models.SET_NULL, null=True)
+    incident           = models.ForeignKey('Incident', on_delete=models.SET_NULL, null=True, blank=True)
+    transaction_type   = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES, default='WITHDRAWAL')
+    failure_type       = models.CharField(max_length=30, choices=FAILURE_TYPE_CHOICES, default='CASH_JAM')
+    failure_reason     = models.TextField()
+    failure_reason_hi  = models.TextField(default='')
+    status             = models.CharField(max_length=30, choices=FAILED_TXN_STATUS_CHOICES, default='DETECTED')
+    refund_status      = models.CharField(max_length=20, choices=REFUND_STATUS_CHOICES, default='PENDING')
+    refund_eta         = models.DateTimeField(null=True, blank=True)
+    engineer_name      = models.CharField(max_length=100, blank=True, default='')
+    engineer_eta_minutes = models.IntegerField(default=0)
+    timeline           = models.JSONField(default=list)
+    created_at         = models.DateTimeField(default=timezone.now)
+    updated_at         = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.transaction_ref} — {self.status}"
+
+    @staticmethod
+    def hash_phone(phone):
+        return hashlib.sha256(phone.strip().encode()).hexdigest()
+
+
+# ─────────────────────────────────────────────
+# OTP TOKEN
+# ─────────────────────────────────────────────
+
+class OTPToken(models.Model):
+    phone_hash  = models.CharField(max_length=64, db_index=True)
+    otp         = models.CharField(max_length=6)
+    created_at  = models.DateTimeField(default=timezone.now)
+    expires_at  = models.DateTimeField()
+    verified    = models.BooleanField(default=False)
+
+    @staticmethod
+    def generate_otp():
+        return f"{secrets.randbelow(900000) + 100000}"
+
+
+# ─────────────────────────────────────────────
+# CUSTOMER SESSION
+# ─────────────────────────────────────────────
+
+class CustomerSession(models.Model):
+    phone_hash  = models.CharField(max_length=64, db_index=True)
+    token       = models.CharField(max_length=64, unique=True, db_index=True)
+    created_at  = models.DateTimeField(default=timezone.now)
+    expires_at  = models.DateTimeField()
+
+    @staticmethod
+    def generate_token():
+        return secrets.token_urlsafe(48)
+
+
+# ─────────────────────────────────────────────
+# STATUS TOKEN (SMS link — single-transaction)
+# ─────────────────────────────────────────────
+
+class StatusToken(models.Model):
+    token              = models.CharField(max_length=64, unique=True, db_index=True)
+    failed_transaction = models.ForeignKey('FailedTransaction', on_delete=models.CASCADE, related_name='status_tokens')
+    created_at         = models.DateTimeField(default=timezone.now)
+    expires_at         = models.DateTimeField()
+
+    @staticmethod
+    def generate_token():
+        return secrets.token_urlsafe(32)

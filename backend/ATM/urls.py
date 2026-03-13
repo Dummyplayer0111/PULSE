@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import customer_views
 
 urlpatterns = [
 
@@ -54,6 +55,7 @@ urlpatterns = [
     path('simulator/start/',   views.simulator_start),
     path('simulator/stop/',    views.simulator_stop),
     path('simulator/status/',  views.simulator_status),
+    path('simulator/demo-reset/', views.demo_reset),
 
     # PIPELINE FEED (REST fallback for live feed)
     path('pipeline/events/',   views.recent_pipeline_events),
@@ -64,4 +66,13 @@ urlpatterns = [
 
     # USERS
     path('users/engineers/',   views.list_engineers),
+
+    # CUSTOMER PORTAL
+    path('customer/request-otp/',              customer_views.request_otp),
+    path('customer/verify-otp/',               customer_views.verify_otp),
+    path('customer/session-check/',            customer_views.session_check),
+    path('customer/logout/',                   customer_views.customer_logout),
+    path('customer/transactions/',             customer_views.customer_transactions),
+    path('customer/transactions/<str:ref>/',   customer_views.customer_transaction_detail),
+    path('customer/status/<str:token>/',       customer_views.status_by_token),
 ]
