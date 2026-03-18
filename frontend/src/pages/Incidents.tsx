@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { AlertTriangle, Search, X, Brain, Zap, Clock, CheckCircle, Download } from 'lucide-react';
 import {
   useGetIncidentsQuery,
@@ -7,6 +7,8 @@ import {
   useGetEngineersQuery,
 } from '../services/payguardApi';
 import Modal from '../components/common/Modal';
+import { BentoCard } from '../components/BentoCard';
+import { useCountUp } from '../hooks/useCountUp';
 import { formatDate, formatDateTime, shortId } from '../utils';
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
@@ -74,6 +76,47 @@ const CATEGORY_COLORS: Record<string, string> = {
 const SEVERITIES = ['All', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 const STATUSES   = ['All', 'OPEN', 'INVESTIGATING', 'AUTO_RESOLVED', 'RESOLVED', 'ESCALATED'];
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+/* ── Animated stat card ─────────────────────────────────────────────────── */
+function AnimatedStatCard({ label, value, color, delay = 0 }: {
+  label: string; value: number; color: string; delay?: number;
+}) {
+  const animated = useCountUp(value, 1200);
+  return (
+    <BentoCard
+      delay={delay}
+      style={{
+        padding: '12px 20px',
+        borderTop: `2px solid ${color}`,
+        minWidth: 90,
+        textAlign: 'center',
+      }}
+    >
+      <span className="text-2xl font-bold block" style={{ color }}>{animated}</span>
+      <span className="text-[10px] block mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</span>
+    </BentoCard>
+  );
+}
+
+/* ── Animated confidence bar ────────────────────────────────────────────── */
+function ConfBar({ value, color = '#a78bfa' }: { value: number; color?: string }) {
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setWidth(value), 80);
+    return () => clearTimeout(t);
+  }, [value]);
+  return (
+    <div className="flex items-center gap-2">
+      <div className="rounded-full overflow-hidden" style={{ width: 48, height: 4, background: 'rgba(255,255,255,0.07)' }}>
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${width}%`, background: color, transition: 'width 0.9s cubic-bezier(0.16,1,0.3,1)' }}
+        />
+      </div>
+      <span className="text-[11px] font-bold" style={{ color }}>{value}%</span>
+    </div>
+  );
+}
 
 function Pill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
@@ -377,20 +420,9 @@ export default function Incidents() {
 
         {/* Quick stats + Export */}
         <div className="flex items-center gap-3">
-          {[
-            { label: 'Open', value: openCount, color: '#60a5fa' },
-            { label: 'Critical', value: criticalCount, color: '#ef4444' },
-            { label: 'Resolved', value: resolvedCount, color: '#4ade80' },
-          ].map(({ label, value, color }) => (
-            <div
-              key={label}
-              className="flex flex-col items-center px-4 py-2 rounded-xl"
-              style={{ background: 'var(--p-card)', border: `1px solid ${color}40` }}
-            >
-              <span className="text-lg font-bold" style={{ color }}>{value}</span>
-              <span className="text-[10px]" style={{ color: 'var(--p-text-dim)' }}>{label}</span>
-            </div>
-          ))}
+          <AnimatedStatCard label="Open"     value={openCount}     color="#60a5fa" delay={0}   />
+          <AnimatedStatCard label="Critical" value={criticalCount} color="#ef4444" delay={60}  />
+          <AnimatedStatCard label="Resolved" value={resolvedCount} color="#4ade80" delay={120} />
           <button
             onClick={() => exportCSV(filtered)}
             disabled={filtered.length === 0}
@@ -431,10 +463,7 @@ export default function Incidents() {
       </div>
 
       {/* Table */}
-      <div
-        className="rounded-2xl overflow-hidden"
-        style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
-      >
+      <BentoCard noPad style={{ overflow: 'hidden' }}>
         {isLoading ? (
           <div className="p-12 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>Loading…</div>
         ) : filtered.length === 0 ? (
@@ -458,7 +487,7 @@ export default function Incidents() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((inc: any) => {
+              {filtered.map((inc: any, rowIdx: number) => {
                 const sv = sevStyle(inc.severity);
                 const st = staStyle(inc.status);
                 const catColor = CATEGORY_COLORS[inc.rootCauseCategory] ?? '#6b7280';
@@ -467,7 +496,11 @@ export default function Incidents() {
                   <tr
                     key={inc.id}
                     className="transition-colors cursor-pointer"
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                    style={{
+                      borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      animation: 'bentoEnter 0.55s cubic-bezier(0.16,1,0.3,1) both',
+                      animationDelay: `${rowIdx * 28}ms`,
+                    }}
                     onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--p-card-hover)'}
                     onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
                     onClick={() => setDetailInc(inc)}
@@ -487,14 +520,7 @@ export default function Incidents() {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      {conf != null ? (
-                        <div className="flex items-center gap-2">
-                          <div className="rounded-full overflow-hidden" style={{ width: 48, height: 4, background: 'rgba(255,255,255,0.07)' }}>
-                            <div className="h-full rounded-full" style={{ width: `${conf}%`, background: '#a78bfa' }} />
-                          </div>
-                          <span className="text-[11px] font-bold" style={{ color: '#a78bfa' }}>{conf}%</span>
-                        </div>
-                      ) : '—'}
+                      {conf != null ? <ConfBar value={conf} /> : <span style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>}
                     </td>
                     <td className="px-5 py-4">
                       <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold" style={{ color: sv.color, background: sv.bg }}>
@@ -544,7 +570,7 @@ export default function Incidents() {
             </tbody>
           </table>
         )}
-      </div>
+      </BentoCard>
 
       {/* Incident Detail Modal */}
       <Modal

@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { BentoCard } from '../components/BentoCard';
+import { useCountUp } from '../hooks/useCountUp';
+import DonutChartAnimated from '../components/charts/DonutChart';
 import {
   Brain, Play, Square, Activity, AlertTriangle, CheckCircle,
   Zap, Wifi, WifiOff, Loader, BarChart2, ChevronDown, ChevronUp,
@@ -119,17 +122,34 @@ function severityReason(ev: PipelineEvent): string {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub, color }: {
-  label: string; value: string | number; sub?: string; color: string;
+function StatCard({ label, value, sub, color, delay = 0 }: {
+  label: string; value: string | number; sub?: string; color: string; delay?: number;
 }) {
+  const numVal = typeof value === 'number' ? value : null;
+  const animated = useCountUp(numVal ?? 0, 1400);
+  const display = numVal != null ? animated.toLocaleString() : value;
   return (
-    <div
-      className="rounded-2xl p-4 flex flex-col gap-1"
-      style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
+    <BentoCard
+      delay={delay}
+      style={{ padding: 16, borderTop: `2px solid ${color}` }}
     >
-      <span className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</span>
-      <span className="text-2xl font-bold" style={{ color }}>{value}</span>
-      {sub && <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{sub}</span>}
+      <span className="text-[11px] font-medium block" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</span>
+      <span className="text-2xl font-bold block mt-1" style={{ color }}>{display}</span>
+      {sub && <span className="text-[10px] block mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{sub}</span>}
+    </BentoCard>
+  );
+}
+
+function AnimConfBar({ value, color }: { value: number; color: string }) {
+  const [w, setW] = useState(0);
+  useEffect(() => { const t = setTimeout(() => setW(value), 200); return () => clearTimeout(t); }, [value]);
+  return (
+    <div className="rounded-full overflow-hidden" style={{ height: 5, background: 'rgba(255,255,255,0.07)' }}>
+      <div className="h-full rounded-full" style={{
+        width: `${w}%`,
+        background: `linear-gradient(90deg,${color}99,${color})`,
+        transition: 'width 1s cubic-bezier(0.16,1,0.3,1)',
+      }} />
     </div>
   );
 }
@@ -643,7 +663,7 @@ function AtRiskATMs() {
 
 // ─── Donut Chart (Root Cause) ─────────────────────────────────────────────────
 
-function DonutChart({ stats }: { stats: any[] }) {
+function AIDonutChart({ stats }: { stats: any[] }) {
   if (stats.length === 0) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -934,15 +954,15 @@ export default function AIAnalysisPage() {
 
       {/* ── Stats ── */}
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-        <StatCard label="Logs Processed" value={totalProcessed.toLocaleString()}
-          sub={running ? 'Simulator active' : 'Simulator stopped'} color="#60a5fa" />
-        <StatCard label="Incidents Created" value={totalIncidents} sub="Auto by AI" color="#f97316" />
-        <StatCard label="Self-Heals Triggered" value={totalSelfHeals} sub="AUTO pipeline" color="#4ade80" />
+        <StatCard label="Logs Processed"      value={totalProcessed}  sub={running ? 'Simulator active' : 'Simulator stopped'} color="#60a5fa" delay={0}   />
+        <StatCard label="Incidents Created"   value={totalIncidents}  sub="Auto by AI"                                         color="#f97316" delay={60}  />
+        <StatCard label="Self-Heals Triggered" value={totalSelfHeals} sub="AUTO pipeline"                                      color="#4ade80" delay={120} />
         <StatCard
           label="Avg AI Confidence"
           value={classifiedEvents.length > 0 ? `${avgConfidence}%` : '—'}
           sub={`${classifiedEvents.length} classified`}
           color="#a855f7"
+          delay={180}
         />
       </div>
 
@@ -952,10 +972,7 @@ export default function AIAnalysisPage() {
 
         {/* Left: Live pipeline feed */}
         <div className="flex-1 flex flex-col gap-3" style={{ minWidth: 0 }}>
-          <div
-            className="rounded-2xl p-4 flex flex-col gap-3"
-            style={{ background: 'var(--p-card)', border: '1px solid rgba(255,255,255,0.07)' }}
-          >
+          <BentoCard delay={80} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Activity size={14} style={{ color: '#60a5fa' }} />
@@ -1020,7 +1037,7 @@ export default function AIAnalysisPage() {
                 ))
               )}
             </div>
-          </div>
+          </BentoCard>
 
           {/* AI Log Analyzer */}
           <AILogAnalyzer />
@@ -1030,10 +1047,7 @@ export default function AIAnalysisPage() {
         <div className="flex flex-col gap-3" style={{ width: '340px' }}>
 
           {/* At-Risk ATMs */}
-          <div
-            className="rounded-2xl p-4 flex flex-col gap-3"
-            style={{ background: 'var(--p-card)', border: '1px solid rgba(255,255,255,0.07)' }}
-          >
+          <BentoCard delay={120} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div className="flex items-center gap-2">
               <TrendingDown size={14} style={{ color: '#ef4444' }} />
               <span className="text-sm font-semibold text-white">At-Risk ATMs</span>
@@ -1045,13 +1059,10 @@ export default function AIAnalysisPage() {
               </span>
             </div>
             <AtRiskATMs />
-          </div>
+          </BentoCard>
 
           {/* Recent Incidents */}
-          <div
-            className="rounded-2xl p-4 flex flex-col gap-3"
-            style={{ background: 'var(--p-card)', border: '1px solid rgba(255,255,255,0.07)' }}
-          >
+          <BentoCard delay={200} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div className="flex items-center gap-2">
               <AlertTriangle size={14} style={{ color: '#f97316' }} />
               <span className="text-sm font-semibold text-white">Recent Incidents</span>
@@ -1097,7 +1108,7 @@ export default function AIAnalysisPage() {
                 );
               })}
             </div>
-          </div>
+          </BentoCard>
 
         </div>
       </div>{/* end top flex row */}
@@ -1106,34 +1117,37 @@ export default function AIAnalysisPage() {
       <div className="grid grid-cols-4 gap-3">
 
         {/* Root Cause Breakdown */}
-        <div
-          className="rounded-2xl p-4 flex flex-col gap-3"
-          style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
-        >
+        <BentoCard delay={60} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="flex items-center gap-2">
             <BarChart2 size={14} style={{ color: '#a855f7' }} />
             <span className="text-sm font-semibold text-white">Root Cause Breakdown</span>
           </div>
-          <DonutChart stats={stats} />
-        </div>
+          {stats.length > 0 ? (
+            <DonutChartAnimated
+              data={stats.map((s: any) => ({
+                label: s.category,
+                value: s.count,
+                color: CATEGORY_COLOR[s.category] ?? '#6b7280',
+              }))}
+              size={150}
+              title="incidents"
+            />
+          ) : (
+            <AIDonutChart stats={stats} />
+          )}
+        </BentoCard>
 
         {/* 7-Day Failure Trend */}
-        <div
-          className="rounded-2xl p-4 flex flex-col gap-3"
-          style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
-        >
+        <BentoCard delay={120} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="flex items-center gap-2">
             <Activity size={14} style={{ color: '#60a5fa' }} />
             <span className="text-sm font-semibold text-white">7-Day Failure Trend</span>
           </div>
           <FailureTrendChart />
-        </div>
+        </BentoCard>
 
         {/* Pipeline Flow */}
-        <div
-          className="rounded-2xl p-4 flex flex-col gap-3"
-          style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
-        >
+        <BentoCard delay={180} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="flex items-center gap-2">
             <Zap size={14} style={{ color: '#f59e0b' }} />
             <span className="text-sm font-semibold text-white">Pipeline Flow</span>
@@ -1161,13 +1175,10 @@ export default function AIAnalysisPage() {
               </div>
             ))}
           </div>
-        </div>
+        </BentoCard>
 
         {/* Model Performance */}
-        <div
-          className="rounded-2xl p-4 flex flex-col gap-3"
-          style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
-        >
+        <BentoCard delay={240} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Brain size={14} style={{ color: '#a855f7' }} />
@@ -1190,9 +1201,7 @@ export default function AIAnalysisPage() {
                 </div>
                 <span className="text-sm font-bold" style={{ color }}>{value.toFixed(2)}</span>
               </div>
-              <div className="rounded-full overflow-hidden" style={{ height: 5, background: 'rgba(255,255,255,0.07)' }}>
-                <div className="h-full rounded-full" style={{ width: `${Math.round(value * 100)}%`, background: `linear-gradient(90deg,${color}99,${color})`, transition: 'width 0.6s ease' }} />
-              </div>
+              <AnimConfBar value={Math.round(value * 100)} color={color} />
             </div>
           ))}
           <div style={{ height: 1, background: 'var(--p-card-border)' }} />
@@ -1212,7 +1221,7 @@ export default function AIAnalysisPage() {
               </div>
             ))}
           </div>
-        </div>
+        </BentoCard>
 
       </div>{/* end bottom grid */}
       </div>{/* end outer flex-col */}

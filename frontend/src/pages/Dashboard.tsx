@@ -1,5 +1,5 @@
-import React from 'react';
-import { AlertTriangle, Brain, ShieldAlert, CheckCircle2, AlertCircle } from 'lucide-react';
+import React, { useRef, useEffect, useState } from 'react';
+import { AlertTriangle, Brain, ShieldAlert, CheckCircle2, AlertCircle, TrendingUp, Activity, Zap, Shield } from 'lucide-react';
 import {
   useGetDashboardSummaryQuery,
   useGetIncidentsQuery,
@@ -13,8 +13,11 @@ import { formatDate, formatConfidence } from '../utils';
 import { usePipelineSocket } from '../hooks/usePipelineSocket';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
+import { useCountUp, useCountUpFloat } from '../hooks/useCountUp';
+import { BentoCard } from '../components/BentoCard';
+import DonutChart from '../components/charts/DonutChart';
 
-/* ── colour helpers ──────────────────────────────────────────────────── */
+/* ── colour helpers ─────────────────────────────────────────────────────── */
 function sevColor(s: string) {
   return ({ CRITICAL: '#ef4444', HIGH: '#f97316', MEDIUM: '#eab308', LOW: '#22c55e' } as any)[s] ?? '#6b7280';
 }
@@ -26,76 +29,76 @@ function staColor(s: string) {
   } as any)[s] ?? '#6b7280';
 }
 
-/* ── Divider ─────────────────────────────────────────────────────────── */
-const Div = () => <div style={{ height: 1, background: 'var(--p-card-border)', margin: '0' }} />;
-
-/* ── Section Header ──────────────────────────────────────────────────── */
-function SectionHead({ title, right }: { title: string; right?: React.ReactNode }) {
+/* ── Section header ─────────────────────────────────────────────────────── */
+function SH({ title, right }: { title: string; right?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--p-card-border)' }}>
-      <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--p-text-dim)', letterSpacing: '0.1em' }}>{title}</span>
-      {right && <span style={{ color: 'var(--p-text-dim)' }}>{right}</span>}
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid var(--p-card-border)' }}>
+      <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--p-text-dim)' }}>{title}</span>
+      {right && <span style={{ color: 'var(--p-text-dim)', fontSize: 10 }}>{right}</span>}
     </div>
   );
 }
 
-/* ── Card shell ──────────────────────────────────────────────────────── */
-function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-xl overflow-hidden ${className}`} style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}>
-      {children}
-    </div>
-  );
+/* ── Skeleton ───────────────────────────────────────────────────────────── */
+function Skel({ h = 'h-4' }: { h?: string }) {
+  return <div className={`${h} rounded animate-pulse`} style={{ background: 'var(--p-card-strong)' }} />;
 }
 
-/* ── Metric strip (replaces KPI cards) ───────────────────────────────── */
-function MetricStrip({ metrics }: { metrics: { label: string; value: string | number; color?: string; note?: string }[] }) {
+/* ── Animated metric KPI card ───────────────────────────────────────────── */
+function MetricCard({
+  label, rawValue, suffix = '', prefix = '', color = '#e8af48',
+  note, icon: Icon, delay = 0, isFloat = false,
+}: {
+  label: string; rawValue: number; suffix?: string; prefix?: string;
+  color?: string; note?: string; icon?: any; delay?: number; isFloat?: boolean;
+}) {
+  const intVal   = useCountUp(isFloat ? 0 : rawValue, 1600);
+  const floatVal = useCountUpFloat(isFloat ? rawValue : 0, 1, 1600);
+
+  const displayVal = isFloat ? floatVal : String(intVal);
+
   return (
-    <Card>
-      <div className="grid" style={{ gridTemplateColumns: `repeat(${metrics.length}, 1fr)` }}>
-        {metrics.map((m, i) => (
-          <div
-            key={i}
-            className="px-5 py-4"
-            style={{
-              borderRight: i < metrics.length - 1 ? '1px solid var(--p-card-border)' : 'none',
-              borderTop: `2px solid ${m.color ?? 'rgba(255,255,255,0.08)'}`,
-            }}
-          >
-            <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--p-text-dim)', letterSpacing: '0.09em' }}>
-              {m.label}
-            </p>
-            <p className="text-2xl font-bold leading-none" style={{ color: m.color ?? 'var(--p-text)', fontVariantNumeric: 'tabular-nums' }}>
-              {m.value}
-            </p>
-            {m.note && <p className="text-[10px] mt-1.5" style={{ color: 'var(--p-text-dim)' }}>{m.note}</p>}
-          </div>
-        ))}
+    <BentoCard delay={delay} style={{ borderTop: `2px solid ${color}` }}>
+      <div style={{ padding: '16px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+          <p style={{ fontSize: 9.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--p-text-dim)', margin: 0 }}>
+            {label}
+          </p>
+          {Icon && (
+            <div style={{ width: 26, height: 26, borderRadius: 7, background: `${color}14`, border: `1px solid ${color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon size={12} style={{ color }} />
+            </div>
+          )}
+        </div>
+        <p style={{ fontSize: 28, fontWeight: 800, lineHeight: 1, color, margin: 0, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
+          {prefix}{displayVal}{suffix}
+        </p>
+        {note && <p style={{ fontSize: 9.5, marginTop: 6, color: 'var(--p-text-dim)', margin: '6px 0 0' }}>{note}</p>}
       </div>
-    </Card>
+      {/* Micro spark line at bottom */}
+      <div style={{ height: 2, background: `linear-gradient(90deg, ${color}00, ${color}40, ${color}00)`, marginTop: 4 }} />
+    </BentoCard>
   );
 }
 
-/* ── Fleet status bar ────────────────────────────────────────────────── */
+/* ── Fleet status bar ───────────────────────────────────────────────────── */
 function FleetBar({ online, degraded, offline, total }: { online: number; degraded: number; offline: number; total: number }) {
+  const [animated, setAnimated] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setAnimated(true), 300); return () => clearTimeout(t); }, []);
   const pct = (n: number) => total > 0 ? `${((n / total) * 100).toFixed(0)}%` : '0%';
+
   return (
     <div>
-      {/* Segmented bar */}
-      <div className="flex rounded-full overflow-hidden mb-3" style={{ height: 6, background: 'rgba(255,255,255,0.06)' }}>
-        {online   > 0 && <div style={{ width: pct(online),   background: '#22c55e', transition: 'width 0.5s' }} />}
-        {degraded > 0 && <div style={{ width: pct(degraded), background: '#eab308', transition: 'width 0.5s' }} />}
-        {offline  > 0 && <div style={{ width: pct(offline),  background: '#ef4444', transition: 'width 0.5s' }} />}
+      <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', height: 6, background: 'rgba(255,255,255,0.05)', marginBottom: 14 }}>
+        {online   > 0 && <div style={{ width: animated ? pct(online)   : '0%', background: '#22c55e', transition: 'width 1.2s cubic-bezier(0.16,1,0.3,1)' }} />}
+        {degraded > 0 && <div style={{ width: animated ? pct(degraded) : '0%', background: '#eab308', transition: 'width 1.2s cubic-bezier(0.16,1,0.3,1) 0.1s' }} />}
+        {offline  > 0 && <div style={{ width: animated ? pct(offline)  : '0%', background: '#ef4444', transition: 'width 1.2s cubic-bezier(0.16,1,0.3,1) 0.2s' }} />}
       </div>
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: 'Online',   value: online,   color: '#22c55e' },
-          { label: 'Degraded', value: degraded, color: '#eab308' },
-          { label: 'Offline',  value: offline,  color: '#ef4444' },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="rounded-lg px-3 py-2.5 text-center" style={{ background: `${color}0c`, border: `1px solid ${color}20` }}>
-            <p className="text-lg font-bold leading-none" style={{ color, fontVariantNumeric: 'tabular-nums' }}>{value}</p>
-            <p className="text-[10px] mt-1 font-medium uppercase tracking-wider" style={{ color: 'var(--p-text-dim)' }}>{label}</p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+        {[{ l: 'Online', v: online, c: '#22c55e' }, { l: 'Degraded', v: degraded, c: '#eab308' }, { l: 'Offline', v: offline, c: '#ef4444' }].map(({ l, v, c }) => (
+          <div key={l} style={{ borderRadius: 8, padding: '10px 12px', textAlign: 'center', background: `${c}0c`, border: `1px solid ${c}20` }}>
+            <p style={{ fontSize: 20, fontWeight: 800, color: c, margin: 0, fontVariantNumeric: 'tabular-nums' }}>{v}</p>
+            <p style={{ fontSize: 9, marginTop: 3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--p-text-dim)', margin: '3px 0 0' }}>{l}</p>
           </div>
         ))}
       </div>
@@ -103,105 +106,108 @@ function FleetBar({ online, degraded, offline, total }: { online: number; degrad
   );
 }
 
-/* ── Donut chart ─────────────────────────────────────────────────────── */
-const RC_COLORS: Record<string, string> = {
-  NETWORK: '#60a5fa', HARDWARE: '#f97316', CASH_JAM: '#eab308',
-  FRAUD: '#ef4444', SERVER: '#a78bfa', TIMEOUT: '#fb923c',
-  SWITCH: '#34d399', UNKNOWN: '#6b7280',
-};
-
-function RootCauseDonut({ stats }: { stats: any[] }) {
-  const SIZE = 120, CX = 60, CY = 60, R = 46, INNER = 28;
-  const total = stats.reduce((a: number, s: any) => a + (s.count ?? 0), 0);
-
-  if (!stats.length || total === 0) {
-    return (
-      <div className="p-6 text-center">
-        <AlertCircle size={20} style={{ color: 'rgba(255,255,255,0.1)', margin: '0 auto 6px' }} />
-        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>No incidents yet</p>
-      </div>
-    );
-  }
-
-  let angle = -Math.PI / 2;
-  const arcs = stats.map((s: any, i: number) => {
-    const color = RC_COLORS[s.category] ?? `hsl(${i * 45},55%,55%)`;
-    const sweep = ((s.count ?? 0) / total) * 2 * Math.PI;
-    const x1 = CX + R * Math.cos(angle), y1 = CY + R * Math.sin(angle);
-    angle += sweep;
-    const x2 = CX + R * Math.cos(angle), y2 = CY + R * Math.sin(angle);
-    return {
-      path: `M ${CX} ${CY} L ${x1.toFixed(1)} ${y1.toFixed(1)} A ${R} ${R} 0 ${sweep > Math.PI ? 1 : 0} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z`,
-      color, pct: Math.round(((s.count ?? 0) / total) * 100),
-      category: s.category, count: s.count,
-    };
-  });
-
+/* ── Animated AI confidence bar ─────────────────────────────────────────── */
+function ConfBar({ value, color = '#a78bfa' }: { value: number; color?: string }) {
+  const [w, setW] = useState(0);
+  useEffect(() => { const t = setTimeout(() => setW(value), 400); return () => clearTimeout(t); }, [value]);
   return (
-    <div className="flex items-center gap-5 px-5 py-4">
-      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ flexShrink: 0 }}>
-        {arcs.map((a, i) => <path key={i} d={a.path} fill={a.color} stroke="var(--p-card)" strokeWidth="1.5" />)}
-        <circle cx={CX} cy={CY} r={INNER} fill="var(--p-gauge-inner)" />
-        <text x={CX} y={CY - 2} textAnchor="middle" fill="var(--p-text)" fontSize="15" fontWeight="700" fontFamily="inherit">{total}</text>
-        <text x={CX} y={CY + 11} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize="7.5" fontFamily="inherit">total</text>
-      </svg>
-      <div className="flex-1 space-y-1.5">
-        {stats.slice(0, 6).map((s: any, i: number) => {
-          const color = RC_COLORS[s.category] ?? `hsl(${i * 45},55%,55%)`;
-          const pct = total > 0 ? Math.round(((s.count ?? 0) / total) * 100) : 0;
-          return (
-            <div key={i} className="flex items-center gap-2">
-              <span style={{ width: 6, height: 6, borderRadius: 1, background: color, flexShrink: 0, display: 'inline-block' }} />
-              <span className="text-[11px] flex-1 truncate" style={{ color: 'var(--p-text-dim)' }}>{s.category}</span>
-              <div style={{ width: 48, height: 2, borderRadius: 1, background: 'var(--p-card-strong)', overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 1 }} />
-              </div>
-              <span className="text-[10px] w-6 text-right tabular-nums" style={{ color: 'var(--p-text-dim)' }}>{pct}%</span>
-            </div>
-          );
-        })}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ width: 44, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+        <div style={{ width: `${w}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 1.1s cubic-bezier(0.16,1,0.3,1)' }} />
       </div>
+      <span style={{ fontSize: 11, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>{Math.round(value)}%</span>
     </div>
   );
 }
 
-/* ── Live event row ──────────────────────────────────────────────────── */
+/* ── Event row ──────────────────────────────────────────────────────────── */
 function EventRow({ ev }: { ev: any }) {
-  const hasInc = !!ev.incident;
-  const color  = hasInc ? sevColor(ev.incident?.severity) : 'var(--p-text-dim)';
-  const lvl    = ev.log?.logLevel ?? 'INFO';
+  const hasInc  = !!ev.incident;
+  const color   = hasInc ? sevColor(ev.incident?.severity) : 'var(--p-text-dim)';
+  const lvl     = ev.log?.logLevel ?? 'INFO';
   const lvlColor: Record<string, string> = { CRITICAL: '#ef4444', ERROR: '#f97316', WARN: '#eab308', INFO: '#6b7280' };
 
   return (
-    <div className="grid px-5 py-2" style={{ gridTemplateColumns: '44px 1fr 1fr auto', gap: '0 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center' }}>
-      <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: lvlColor[lvl] ?? '#6b7280' }}>{lvl}</span>
-      <span className="text-[11px] font-mono truncate" style={{ color: 'var(--p-text-dim)' }}>{ev.log?.eventCode ?? '—'}</span>
-      <span className="text-[11px] truncate" style={{ color: hasInc ? color : 'rgba(255,255,255,0.2)' }}>
+    <div
+      style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr auto', gap: '0 12px', padding: '8px 20px', borderBottom: '1px solid rgba(255,255,255,0.035)', alignItems: 'center' }}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--p-card-hover)'}
+      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+    >
+      <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: lvlColor[lvl] ?? '#6b7280' }}>{lvl}</span>
+      <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--p-text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.log?.eventCode ?? '—'}</span>
+      <span style={{ fontSize: 11, color: hasInc ? color : 'rgba(255,255,255,0.18)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {hasInc ? ev.incident.incidentId : '—'}
       </span>
-      <span className="text-[10px] tabular-nums" style={{ color: 'rgba(255,255,255,0.2)', whiteSpace: 'nowrap' }}>
+      <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.18)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
         {new Date(ev.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
       </span>
     </div>
   );
 }
 
-/* ── Skeleton ────────────────────────────────────────────────────────── */
-function Skel({ h = 'h-4' }: { h?: string }) {
-  return <div className={`${h} rounded animate-pulse`} style={{ background: 'var(--p-card-strong)' }} />;
+/* ── Root cause row (enhanced progress list) ────────────────────────────── */
+const RC_COLORS: Record<string, string> = {
+  NETWORK: '#60a5fa', HARDWARE: '#f97316', CASH_JAM: '#eab308',
+  FRAUD: '#ef4444', SERVER: '#a78bfa', TIMEOUT: '#fb923c',
+  SWITCH: '#34d399', UNKNOWN: '#6b7280',
+};
+const RC_ICONS: Record<string, string> = {
+  NETWORK: '🌐', HARDWARE: '⚙️', CASH_JAM: '💵', FRAUD: '🚨',
+  SERVER: '🖥️', TIMEOUT: '⏱️', SWITCH: '🔁', UNKNOWN: '❓',
+};
+
+function RCRow({ cat, count, pct, total, index }: { cat: string; count: number; pct: number; total: number; index: number }) {
+  const color = RC_COLORS[cat] ?? '#6b7280';
+  const [barW, setBarW]         = useState(0);
+  const [visible, setVisible]   = useState(false);
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setVisible(true),  index * 80);
+    const t2 = setTimeout(() => setBarW(pct),       index * 80 + 300);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [index, pct]);
+
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '7px 20px',
+        borderBottom: '1px solid rgba(255,255,255,0.035)',
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateX(0)' : 'translateX(-12px)',
+        transition: 'opacity 0.45s ease, transform 0.45s cubic-bezier(0.16,1,0.3,1)',
+        cursor: 'default',
+      }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateX(5px)'; (e.currentTarget as HTMLElement).style.background = 'var(--p-card-hover)'; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateX(0)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+    >
+      <span style={{ fontSize: 13 }}>{RC_ICONS[cat] ?? '📊'}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--p-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>{count}</span>
+            <span style={{ fontSize: 10, color: 'var(--p-text-dim)' }}>{pct}%</span>
+          </div>
+        </div>
+        <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+          <div style={{ width: `${barW}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 1.3s cubic-bezier(0.16,1,0.3,1)', boxShadow: `0 0 8px ${color}50` }} />
+        </div>
+      </div>
+    </div>
+  );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════════
    MAIN PAGE
-═══════════════════════════════════════════════════════════════════════ */
+═══════════════════════════════════════════════════════════════════════════ */
 export default function Dashboard() {
-  const { data: summary }                              = useGetDashboardSummaryQuery(undefined, { pollingInterval: 5000 });
+  const { data: summary }                               = useGetDashboardSummaryQuery(undefined, { pollingInterval: 5000 });
   const { data: incidents = [], isLoading: incLoading } = useGetIncidentsQuery(undefined, { pollingInterval: 5000 });
-  const { data: anomalies = [] }                       = useGetAnomalyFlagsQuery();
+  const { data: anomalies = [] }                        = useGetAnomalyFlagsQuery();
   const { data: actions   = [], isLoading: shLoading }  = useGetSelfHealActionsQuery();
-  const { data: preds }                                = useGetAIPredictionsQuery();
-  const { data: rcStats }                              = useGetRootCauseStatsQuery();
-  const { data: channels = [] }                        = useGetChannelsQuery();
+  const { data: preds }                                 = useGetAIPredictionsQuery();
+  const { data: rcStats }                               = useGetRootCauseStatsQuery();
+  const { data: channels = [] }                         = useGetChannelsQuery();
 
   const { status: wsStatus } = usePipelineSocket();
   const pipelineEvents = useSelector((s: RootState) => s.pipeline.events);
@@ -217,273 +223,278 @@ export default function Dashboard() {
   const recentEvents   = pipelineEvents.slice(0, 14);
   const now            = new Date().toLocaleString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
+  /* Donut data */
+  const donutData = statsList.map((s: any) => ({
+    label: s.category,
+    value: s.count ?? 0,
+    color: RC_COLORS[s.category] ?? '#6b7280',
+  }));
+
   return (
     <div className="p-5 space-y-4" style={{ minHeight: '100vh' }}>
 
-      {/* ── Critical alert banner ────────────────────────────────────── */}
+      {/* ── Critical alert banner ─────────────────────────────────────── */}
       {activeAno > 0 && (
-        <div className="rounded-lg px-4 py-2.5 flex items-center gap-3" style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)' }}>
-          <AlertTriangle size={12} style={{ color: '#ef4444', flexShrink: 0 }} />
-          <span className="text-xs font-semibold" style={{ color: '#ef4444' }}>
+        <div
+          style={{ borderRadius: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.22)', animation: 'bentoEnter 0.5s cubic-bezier(0.16,1,0.3,1) both' }}
+        >
+          <ShieldAlert size={13} style={{ color: '#ef4444', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#ef4444' }}>
             {activeAno} active anomal{activeAno === 1 ? 'y' : 'ies'} — Z-score engine flagged suspicious activity
           </span>
-          <span className="ml-auto text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(239,68,68,0.7)' }}>Alert</span>
+          <span style={{ marginLeft: 'auto', fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(239,68,68,0.65)' }}>Alert</span>
         </div>
       )}
 
-      {/* ── Page header ─────────────────────────────────────────────── */}
-      <div className="flex items-end justify-between gap-4 flex-wrap">
+      {/* ── Page header ───────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <h1 className="text-lg font-bold leading-none" style={{ color: 'var(--p-text)', letterSpacing: '-0.02em' }}>Operations Center</h1>
-          <p className="text-[11px] mt-1" style={{ color: 'var(--p-text-dim)' }}>ATM & payment infrastructure — real-time</p>
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: 'var(--p-text)', letterSpacing: '-0.02em', margin: 0 }}>Operations Center</h1>
+          <p style={{ fontSize: 11, color: 'var(--p-text-dim)', marginTop: 3 }}>ATM & payment infrastructure — real-time</p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* WS indicator */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--p-text-dim)' }}>Feed</span>
-            <span
-              className="text-[10px] font-semibold"
-              style={{ color: wsStatus === 'connected' ? '#22c55e' : '#6b7280' }}
-            >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: wsStatus === 'connected' ? '#22c55e' : '#6b7280', boxShadow: wsStatus === 'connected' ? '0 0 6px #22c55e' : undefined }} />
+            <span style={{ fontSize: 10, fontWeight: 600, color: wsStatus === 'connected' ? '#22c55e' : '#6b7280' }}>
               {wsStatus === 'connected' ? 'Live' : 'Connecting'}
             </span>
           </div>
-          <span style={{ width: 1, height: 14, background: 'var(--p-card-border)', display: 'inline-block' }} />
-          {/* Timestamp */}
-          <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>{now}</span>
+          <div style={{ width: 1, height: 14, background: 'var(--p-card-border)' }} />
+          <span style={{ fontSize: 10, color: 'var(--p-text-dim)', fontVariantNumeric: 'tabular-nums' }}>{now}</span>
         </div>
       </div>
 
-      {/* ── Metric strip ─────────────────────────────────────────────── */}
-      <MetricStrip metrics={[
-        { label: 'Open Incidents',   value: incLoading ? '—' : openInc,   color: openInc > 0 ? '#ef4444' : '#22c55e',   note: 'requires attention' },
-        { label: 'Critical Alerts',  value: incLoading ? '—' : critical,  color: critical > 0 ? '#f97316' : '#6b7280',   note: 'severity: critical' },
-        { label: 'Active Anomalies', value: activeAno,                    color: activeAno > 0 ? '#eab308' : '#6b7280',  note: 'flagged by Z-score' },
-        { label: 'AI Predictions',   value: predList.length,              color: predList.length > 0 ? '#a78bfa' : '#6b7280', note: 'at-risk ATMs' },
-        { label: 'Platform Health',  value: `${platformHealth}%`,         color: platformHealth >= 80 ? '#22c55e' : platformHealth >= 60 ? '#eab308' : '#ef4444', note: 'avg. ATM score' },
-        { label: 'UPI Success Rate', value: `${upiRate}%`,                color: upiRate >= 95 ? '#22c55e' : '#eab308', note: 'payment channels' },
-      ]} />
+      {/* ── Metric strip — individual bento cards ──────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
+        <MetricCard label="Open Incidents"   rawValue={incLoading ? 0 : openInc}       color={openInc > 0 ? '#ef4444' : '#22c55e'}   note="requires attention"  icon={AlertTriangle} delay={0}   />
+        <MetricCard label="Critical Alerts"  rawValue={incLoading ? 0 : critical}       color={critical > 0 ? '#f97316' : '#6b7280'}  note="severity: critical"  icon={AlertCircle}   delay={60}  />
+        <MetricCard label="Active Anomalies" rawValue={activeAno}                        color={activeAno > 0 ? '#eab308' : '#6b7280'} note="flagged by Z-score"  icon={ShieldAlert}   delay={120} />
+        <MetricCard label="AI Predictions"   rawValue={predList.length}                  color={predList.length > 0 ? '#a78bfa' : '#6b7280'} note="at-risk ATMs" icon={Brain}         delay={180} />
+        <MetricCard label="Platform Health"  rawValue={platformHealth}       suffix="%"  color={platformHealth >= 80 ? '#22c55e' : platformHealth >= 60 ? '#eab308' : '#ef4444'} note="avg. ATM score" icon={Activity} delay={240} isFloat />
+        <MetricCard label="UPI Success Rate" rawValue={upiRate}              suffix="%"  color={upiRate >= 95 ? '#22c55e' : '#eab308'} note="payment channels" icon={TrendingUp}     delay={300} isFloat />
+      </div>
 
-      {/* ── Payment channels ─────────────────────────────────────────── */}
+      {/* ── Payment channels ──────────────────────────────────────────── */}
       {(channels as any[]).length > 0 && (
-        <Card>
-          <SectionHead title="Payment Channels" right={
-            <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>{(channels as any[]).filter((c: any) => c.status === 'ONLINE').length}/{(channels as any[]).length} online</span>
+        <BentoCard delay={320} noPad>
+          <SH title="Payment Channels" right={
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{(channels as any[]).filter((c: any) => c.status === 'ONLINE').length}/{(channels as any[]).length} online</span>
           } />
-          <div className="px-5 py-3 flex flex-wrap gap-x-6 gap-y-2">
+          <div style={{ padding: '10px 20px', display: 'flex', flexWrap: 'wrap', gap: '6px 24px' }}>
             {(channels as any[]).map((ch: any) => {
               const ok = ch.status === 'ONLINE' || ch.status === 'ACTIVE';
               return (
-                <div key={ch.id} className="flex items-center gap-2">
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: ok ? '#22c55e' : '#ef4444', flexShrink: 0, display: 'inline-block' }} />
-                  <span className="text-[11px] font-medium" style={{ color: ok ? 'var(--p-text)' : 'rgba(255,255,255,0.4)' }}>{ch.name}</span>
-                  <span className="text-[10px]" style={{ color: 'var(--p-text-dim)' }}>{ch.type}</span>
+                <div key={ch.id} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: ok ? '#22c55e' : '#ef4444', flexShrink: 0, display: 'inline-block', boxShadow: ok ? '0 0 5px #22c55e' : undefined }} />
+                  <span style={{ fontSize: 11, fontWeight: 500, color: ok ? 'var(--p-text)' : 'rgba(255,255,255,0.35)' }}>{ch.name}</span>
+                  <span style={{ fontSize: 10, color: 'var(--p-text-dim)' }}>{ch.type}</span>
                 </div>
               );
             })}
           </div>
-        </Card>
+        </BentoCard>
       )}
 
-      {/* ── 3-column row ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* ── 3-column row ──────────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
 
         {/* Fleet Health */}
-        <Card>
-          <SectionHead title="Fleet Health" right={
-            <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>{atmCounts.total} terminals</span>
-          } />
-          <div className="p-5">
-            <FleetBar
-              online={atmCounts.online}
-              degraded={atmCounts.degraded}
-              offline={atmCounts.offline}
-              total={atmCounts.total}
-            />
+        <BentoCard delay={350} noPad>
+          <SH title="Fleet Health" right={<span style={{ fontVariantNumeric: 'tabular-nums' }}>{atmCounts.total} terminals</span>} />
+          <div style={{ padding: 20 }}>
+            <FleetBar online={atmCounts.online} degraded={atmCounts.degraded} offline={atmCounts.offline} total={atmCounts.total} />
           </div>
-        </Card>
+        </BentoCard>
 
         {/* Live Pipeline Feed */}
-        <Card>
-          <SectionHead title="Live Pipeline Feed" right={
-            <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>{recentEvents.length} events</span>
-          } />
-          {/* Column headers */}
+        <BentoCard delay={400} noPad>
+          <SH title="Live Pipeline Feed" right={<span style={{ fontVariantNumeric: 'tabular-nums' }}>{recentEvents.length} events</span>} />
           {recentEvents.length > 0 && (
-            <div className="grid px-5 py-1.5" style={{ gridTemplateColumns: '44px 1fr 1fr auto', gap: '0 12px', borderBottom: '1px solid var(--p-card-border)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr auto', gap: '0 12px', padding: '6px 20px', borderBottom: '1px solid var(--p-card-border)' }}>
               {['Level', 'Event', 'Incident', 'Time'].map(h => (
-                <span key={h} className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>{h}</span>
+                <span key={h} style={{ fontSize: 8.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.18)' }}>{h}</span>
               ))}
             </div>
           )}
           {recentEvents.length === 0 ? (
-            <div className="px-5 py-8 text-center">
-              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>No events — start the simulator</p>
+            <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)' }}>No events — start the simulator</p>
             </div>
           ) : (
-            <div className="overflow-y-auto" style={{ maxHeight: 224 }}>
+            <div style={{ overflowY: 'auto', maxHeight: 224 }}>
               {recentEvents.map((ev: any, i: number) => <EventRow key={`${ev.log?.id}-${i}`} ev={ev} />)}
             </div>
           )}
-        </Card>
+        </BentoCard>
 
         {/* Self-Heal Log */}
-        <Card>
-          <SectionHead title="Self-Heal Log" right={
-            <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>{(actions as any[]).length} actions</span>
-          } />
+        <BentoCard delay={450} noPad>
+          <SH title="Self-Heal Log" right={<span style={{ fontVariantNumeric: 'tabular-nums' }}>{(actions as any[]).length} actions</span>} />
           {shLoading ? (
-            <div className="p-5 space-y-2">{[1,2,3].map(i => <Skel key={i} h="h-8" />)}</div>
+            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>{[1,2,3].map(i => <Skel key={i} h="h-8" />)}</div>
           ) : (actions as any[]).length === 0 ? (
-            <div className="px-5 py-8 text-center">
-              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>No actions yet</p>
+            <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)' }}>No actions yet</p>
             </div>
           ) : (
-            <div className="overflow-y-auto" style={{ maxHeight: 224 }}>
-              {(actions as any[]).slice(0, 10).map((a: any) => (
-                <div key={a.id} className="grid px-5 py-2.5" style={{ gridTemplateColumns: '1fr auto auto', gap: '0 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center' }}>
-                  <span className="text-[11px] truncate font-medium" style={{ color: 'var(--p-text)' }}>
-                    {(a.action_type || a.actionType || '—').replace(/_/g, ' ')}
-                  </span>
-                  <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>
-                    {formatDate(a.created_at || a.createdAt)}
-                  </span>
-                  <span className="text-[10px] font-semibold uppercase" style={{ color: staColor(a.status), letterSpacing: '0.04em' }}>
-                    {a.status}
-                  </span>
-                </div>
-              ))}
+            <div style={{ overflowY: 'auto', maxHeight: 224 }}>
+              {(actions as any[]).slice(0, 10).map((a: any) => {
+                const sc = staColor(a.status);
+                return (
+                  <div
+                    key={a.id}
+                    style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '0 12px', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.035)', alignItems: 'center' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--p-card-hover)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--p-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {(a.action_type || a.actionType || '—').replace(/_/g, ' ')}
+                    </span>
+                    <span style={{ fontSize: 9.5, color: 'var(--p-text-dim)', fontVariantNumeric: 'tabular-nums' }}>{formatDate(a.created_at || a.createdAt)}</span>
+                    <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: sc, background: `${sc}14`, border: `1px solid ${sc}25`, borderRadius: 4, padding: '2px 6px' }}>{a.status}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
-        </Card>
+        </BentoCard>
       </div>
 
       {/* ── Incidents table ───────────────────────────────────────────── */}
-      <Card>
-        <SectionHead title="Recent Incidents" right={
-          <span className="text-[10px] tabular-nums" style={{ color: 'var(--p-text-dim)' }}>
-            {Math.min((incidents as any[]).length, 8)} of {(incidents as any[]).length}
-          </span>
+      <BentoCard delay={480} noPad>
+        <SH title="Recent Incidents" right={
+          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{Math.min((incidents as any[]).length, 8)} of {(incidents as any[]).length}</span>
         } />
         {incLoading ? (
-          <div className="p-5 space-y-2">{[1,2,3,4].map(i => <Skel key={i} h="h-9" />)}</div>
+          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>{[1,2,3,4].map(i => <Skel key={i} h="h-9" />)}</div>
         ) : (incidents as any[]).length === 0 ? (
-          <div className="p-10 text-center">
-            <CheckCircle2 size={22} style={{ color: 'rgba(255,255,255,0.08)', margin: '0 auto 8px' }} />
-            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.2)' }}>No incidents recorded.</p>
+          <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+            <CheckCircle2 size={22} style={{ color: 'rgba(255,255,255,0.07)', margin: '0 auto 8px' }} />
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)' }}>No incidents recorded.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--p-card-border)' }}>
                   {['ID', 'Title', 'Root Cause', 'Confidence', 'Severity', 'Status', 'Created'].map(h => (
-                    <th key={h} className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.22)', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 8.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.2)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {(incidents as any[]).slice(0, 8).map((inc: any) => (
-                  <tr
-                    key={inc.id}
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--p-card-hover)'}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-                  >
-                    <td className="px-5 py-3 font-mono text-[11px]" style={{ color: 'var(--p-text-dim)', whiteSpace: 'nowrap' }}>
-                      {String(inc.incidentId || inc.id).slice(0, 14)}
-                    </td>
-                    <td className="px-5 py-3 text-sm" style={{ color: 'var(--p-text)', maxWidth: 180 }}>
-                      <span className="truncate block">{inc.title || '—'}</span>
-                    </td>
-                    <td className="px-5 py-3 text-[11px] font-medium" style={{ color: 'var(--p-text-dim)', whiteSpace: 'nowrap' }}>
-                      {inc.rootCauseCategory || '—'}
-                    </td>
-                    <td className="px-5 py-3">
-                      {inc.aiConfidence != null && (
-                        <div className="flex items-center gap-2">
-                          <div className="rounded-sm overflow-hidden" style={{ width: 44, height: 2, background: 'rgba(255,255,255,0.07)' }}>
-                            <div style={{ width: `${Math.round(inc.aiConfidence * 100)}%`, height: '100%', background: '#a78bfa' }} />
-                          </div>
-                          <span className="text-[11px] tabular-nums font-semibold" style={{ color: '#a78bfa' }}>
-                            {Math.round(inc.aiConfidence * 100)}%
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: sevColor(inc.severity) }}>
-                        {inc.severity}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3">
-                      <span
-                        className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-sm"
-                        style={{ color: staColor(inc.status), background: `${staColor(inc.status)}12`, border: `1px solid ${staColor(inc.status)}25` }}
-                      >
-                        {inc.status.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-[11px] tabular-nums" style={{ color: 'var(--p-text-dim)', whiteSpace: 'nowrap' }}>
-                      {formatDate(inc.createdAt)}
-                    </td>
-                  </tr>
-                ))}
+                {(incidents as any[]).slice(0, 8).map((inc: any, rowIdx: number) => {
+                  const sc = sevColor(inc.severity);
+                  const stc = staColor(inc.status);
+                  return (
+                    <tr
+                      key={inc.id}
+                      style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', transition: 'background 0.15s ease' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--p-card-hover)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                    >
+                      <td style={{ padding: '12px 20px', fontSize: 10.5, fontFamily: 'monospace', color: 'var(--p-text-dim)', whiteSpace: 'nowrap' }}>
+                        {String(inc.incidentId || inc.id).slice(0, 14)}
+                      </td>
+                      <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--p-text)', maxWidth: 180 }}>
+                        <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inc.title || '—'}</span>
+                      </td>
+                      <td style={{ padding: '12px 20px', fontSize: 11, fontWeight: 600, color: RC_COLORS[inc.rootCauseCategory] ?? 'var(--p-text-dim)', whiteSpace: 'nowrap' }}>
+                        {RC_ICONS[inc.rootCauseCategory] ?? ''} {inc.rootCauseCategory || '—'}
+                      </td>
+                      <td style={{ padding: '12px 20px' }}>
+                        {inc.aiConfidence != null && (
+                          <ConfBar value={Math.round(inc.aiConfidence * 100)} />
+                        )}
+                      </td>
+                      <td style={{ padding: '12px 20px', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: 9.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: sc, background: `${sc}14`, border: `1px solid ${sc}25`, borderRadius: 5, padding: '3px 7px' }}>
+                          {inc.severity}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 20px' }}>
+                        <span style={{ fontSize: 9.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: stc, background: `${stc}12`, border: `1px solid ${stc}22`, borderRadius: 5, padding: '3px 7px', whiteSpace: 'nowrap' }}>
+                          {(inc.status || '').replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 20px', fontSize: 10.5, color: 'var(--p-text-dim)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                        {formatDate(inc.createdAt)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
-      </Card>
+      </BentoCard>
 
       {/* ── AI Predictions + Root Cause ───────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
 
         {/* AI Failure Predictions */}
-        <Card>
-          <SectionHead title="AI Failure Predictions" right={
-            <span className="text-[10px]" style={{ color: '#a78bfa' }}>{predList.length} at-risk</span>
-          } />
+        <BentoCard delay={520} noPad>
+          <SH title="AI Failure Predictions" right={<span style={{ color: '#a78bfa' }}>{predList.length} at-risk</span>} />
           {predList.length === 0 ? (
-            <div className="px-5 py-8 text-center">
-              <Brain size={20} style={{ color: 'rgba(255,255,255,0.08)', margin: '0 auto 6px' }} />
-              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>Feed more health data to generate predictions</p>
+            <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+              <Brain size={20} style={{ color: 'rgba(255,255,255,0.07)', margin: '0 auto 8px', display: 'block' }} />
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)' }}>Feed more health data to generate predictions</p>
             </div>
           ) : (
             <>
-              {/* Column headers */}
-              <div className="grid px-5 py-2" style={{ gridTemplateColumns: '1fr 80px 60px', borderBottom: '1px solid var(--p-card-border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 60px', gap: '0 12px', padding: '7px 20px', borderBottom: '1px solid var(--p-card-border)' }}>
                 {['ATM', 'Horizon', 'Probability'].map(h => (
-                  <span key={h} className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>{h}</span>
+                  <span key={h} style={{ fontSize: 8.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.18)' }}>{h}</span>
                 ))}
               </div>
               {predList.slice(0, 6).map((p: any, i: number) => {
-                const prob = p.failureProbability ?? p.probability ?? p.confidence ?? 0;
+                const prob  = p.failureProbability ?? p.probability ?? p.confidence ?? 0;
                 const color = prob >= 0.8 ? '#ef4444' : prob >= 0.5 ? '#f97316' : '#eab308';
                 return (
-                  <div key={i} className="grid px-5 py-2.5" style={{ gridTemplateColumns: '1fr 80px 60px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center' }}>
+                  <div
+                    key={i}
+                    style={{ display: 'grid', gridTemplateColumns: '1fr 80px 60px', gap: '0 12px', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center', transition: 'background 0.15s ease' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--p-card-hover)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                  >
                     <div>
-                      <p className="text-[12px] font-semibold" style={{ color: 'var(--p-text)' }}>
-                        {p.atmName || `ATM-${i + 1}`}
-                      </p>
-                      <p className="text-[10px]" style={{ color: 'var(--p-text-dim)' }}>
-                        {p.weakestComponent || p.failureCategory || 'Unknown component'}
-                      </p>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--p-text)', margin: 0 }}>{p.atmName || `ATM-${i + 1}`}</p>
+                      <p style={{ fontSize: 10, color: 'var(--p-text-dim)', margin: '2px 0 0' }}>{p.weakestComponent || p.failureCategory || 'Unknown'}</p>
                     </div>
-                    <span className="text-[11px]" style={{ color: 'var(--p-text-dim)' }}>{p.predictedIn || '< 24h'}</span>
-                    <span className="text-[12px] font-bold tabular-nums" style={{ color }}>{formatConfidence(prob)}</span>
+                    <span style={{ fontSize: 11, color: 'var(--p-text-dim)' }}>{p.predictedIn || '< 24h'}</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color, fontVariantNumeric: 'tabular-nums' }}>{formatConfidence(prob)}</span>
                   </div>
                 );
               })}
             </>
           )}
-        </Card>
+        </BentoCard>
 
-        {/* Root Cause Distribution */}
-        <Card>
-          <SectionHead title="Root Cause Distribution" />
-          <RootCauseDonut stats={statsList} />
-        </Card>
-
+        {/* Root Cause Distribution — upgraded */}
+        <BentoCard delay={570} noPad>
+          <SH title="Root Cause Distribution" />
+          {statsList.length === 0 ? (
+            <div style={{ padding: '24px 20px', textAlign: 'center' }}>
+              <AlertCircle size={20} style={{ color: 'rgba(255,255,255,0.07)', margin: '0 auto 8px', display: 'block' }} />
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)' }}>No incidents yet</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 0 }}>
+              {/* Donut */}
+              <div style={{ padding: '16px 20px', flexShrink: 0 }}>
+                <DonutChart data={donutData} size={148} title="incidents" showLegend={false} />
+              </div>
+              {/* Animated progress list */}
+              <div style={{ flex: 1, borderLeft: '1px solid var(--p-card-border)', paddingTop: 8, paddingBottom: 8 }}>
+                {statsList.slice(0, 6).map((s: any, i: number) => {
+                  const total = statsList.reduce((a: number, x: any) => a + (x.count ?? 0), 0);
+                  const pct   = total > 0 ? Math.round(((s.count ?? 0) / total) * 100) : 0;
+                  return <RCRow key={s.category} cat={s.category} count={s.count ?? 0} pct={pct} total={total} index={i} />;
+                })}
+              </div>
+            </div>
+          )}
+        </BentoCard>
       </div>
     </div>
   );

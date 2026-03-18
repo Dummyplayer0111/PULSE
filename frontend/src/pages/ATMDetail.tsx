@@ -11,6 +11,9 @@ import {
 } from '../services/payguardApi';
 import { formatDate, formatDateTime } from '../utils';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { BentoCard } from '../components/BentoCard';
+import HealthGauge from '../components/charts/HealthGauge';
+import TrendLine from '../components/charts/TrendLine';
 
 const TABS = ['Overview', 'Logs', 'Incidents', 'Anomalies', 'Health History', 'Self-Heal'] as const;
 type Tab = typeof TABS[number];
@@ -87,68 +90,18 @@ const TH = ({ children }: { children: React.ReactNode }) => (
   </th>
 );
 
-/* ── Health Sparkline ─────────────────────────────────────────────────── */
+/* ── Health Sparkline — now uses animated TrendLine ──────────────────── */
 function HealthSparkline({ data }: { data: { healthScore: number; timestamp: string }[] }) {
-  if (data.length < 2) {
-    return (
-      <div className="flex items-center justify-center" style={{ height: 80 }}>
-        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>Need more data points</p>
-      </div>
-    );
-  }
-
-  const W = 600;
-  const H = 80;
-  const pad = 4;
-  const values = data.map(d => d.healthScore);
-  const min = Math.max(0, Math.min(...values) - 5);
-  const max = Math.min(100, Math.max(...values) + 5);
-  const range = max - min || 1;
-
-  const points = values.map((v, i) => {
-    const x = pad + (i / (values.length - 1)) * (W - pad * 2);
-    const y = H - pad - ((v - min) / range) * (H - pad * 2);
-    return `${x},${y}`;
-  });
-
-  const polyline = points.join(' ');
-  const areaPath = `M ${points[0]} L ${points.join(' L ')} L ${points[points.length - 1].split(',')[0]},${H} L ${pad},${H} Z`;
-
-  const lastVal = values[values.length - 1];
+  const lastVal = data.length > 0 ? data[data.length - 1].healthScore : 0;
   const lastColor = lastVal >= 80 ? '#4ade80' : lastVal >= 60 ? '#f59e0b' : '#ef4444';
-
+  const trendData = data.map(d => ({ timestamp: d.timestamp, value: d.healthScore }));
   return (
     <div className="space-y-1">
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ height: 80 }}>
-        <defs>
-          <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={lastColor} stopOpacity="0.3" />
-            <stop offset="100%" stopColor={lastColor} stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
-        <path d={areaPath} fill="url(#sparkGrad)" />
-        <polyline
-          points={polyline}
-          fill="none"
-          stroke={lastColor}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {/* Last value dot */}
-        <circle
-          cx={points[points.length - 1].split(',')[0]}
-          cy={points[points.length - 1].split(',')[1]}
-          r="4"
-          fill={lastColor}
-          stroke="#0b0b0f"
-          strokeWidth="2"
-        />
-      </svg>
+      <TrendLine data={trendData} color={lastColor} height={80} showDot showArea noMargin />
       <div className="flex justify-between text-[9px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
-        <span>{formatDate(data[0].timestamp)}</span>
+        <span>{data.length > 0 ? formatDate(data[0].timestamp) : ''}</span>
         <span style={{ color: lastColor, fontWeight: 700 }}>Current: {lastVal}</span>
-        <span>{formatDate(data[data.length - 1].timestamp)}</span>
+        <span>{data.length > 0 ? formatDate(data[data.length - 1].timestamp) : ''}</span>
       </div>
     </div>
   );
@@ -395,6 +348,16 @@ function ActiveIncidentCard({ incidents }: { incidents: any[] }) {
   );
 }
 
+function ScoreBar({ value, color }: { value: number; color: string }) {
+  const [w, setW] = useState(0);
+  useEffect(() => { const t = setTimeout(() => setW(value), 300); return () => clearTimeout(t); }, [value]);
+  return (
+    <div className="mt-1 rounded-full overflow-hidden" style={{ height: 2, background: 'var(--p-card-strong)' }}>
+      <div className="h-full rounded-full" style={{ width: `${w}%`, background: color, transition: 'width 1s cubic-bezier(0.16,1,0.3,1)' }} />
+    </div>
+  );
+}
+
 export default function ATMDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const [tab, setTab] = useState<Tab>('Overview');
@@ -509,41 +472,9 @@ export default function ATMDetail() {
       ) : (
         <>
           {/* Overview strip */}
-          <div
-            className="rounded-2xl p-6 flex flex-wrap items-center gap-8"
-            style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
-          >
-            {/* Health score ring */}
-            <div className="flex flex-col items-center gap-2">
-              {(() => {
-                const score = atm?.healthScore ?? 0;
-                const color = score >= 80 ? '#4ade80' : score >= 60 ? '#f59e0b' : '#ef4444';
-                const size = 80;
-                const sw = 7;
-                const r = (size - sw) / 2;
-                const circ = 2 * Math.PI * r;
-                const dash = (score / 100) * circ;
-                return (
-                  <div style={{ position: 'relative', width: size, height: size }}>
-                    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-                      {/* Track */}
-                      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={sw} />
-                      {/* Arc */}
-                      <circle
-                        cx={size/2} cy={size/2} r={r} fill="none"
-                        stroke={color} strokeWidth={sw} strokeLinecap="round"
-                        strokeDasharray={`${dash} ${circ}`}
-                        style={{ transition: 'stroke-dasharray 0.6s ease, stroke 0.4s ease', filter: `drop-shadow(0 0 4px ${color}88)` }}
-                      />
-                    </svg>
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: '1rem', fontWeight: 700, color: '#fff' }}>{score}</span>
-                    </div>
-                  </div>
-                );
-              })()}
-              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Health Score</span>
-            </div>
+          <BentoCard delay={0} style={{ padding: 24, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 32 }}>
+            {/* Health score gauge */}
+            <HealthGauge score={atm?.healthScore ?? 0} label="Health Score" size={110} />
 
             {/* Score grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -562,11 +493,7 @@ export default function ATMDetail() {
                   <p className="text-lg font-bold mt-0.5" style={{ color: value != null && (value as number) >= 80 ? color : value != null && (value as number) >= 60 ? '#f59e0b' : '#ef4444' }}>
                     {value != null ? `${value}` : '—'}
                   </p>
-                  {value != null && (
-                    <div className="mt-1 rounded-full overflow-hidden" style={{ height: 2, background: 'var(--p-card-strong)' }}>
-                      <div className="h-full rounded-full" style={{ width: `${value}%`, background: color }} />
-                    </div>
-                  )}
+                  {value != null && <ScoreBar value={value as number} color={color} />}
                 </div>
               ))}
             </div>
@@ -586,7 +513,7 @@ export default function ATMDetail() {
                 </div>
               )}
             </div>
-          </div>
+          </BentoCard>
 
           {/* Tabs */}
           <div style={{ borderBottom: '1px solid var(--p-card-border)' }}>
@@ -617,10 +544,7 @@ export default function ATMDetail() {
           </div>
 
           {/* Tab content */}
-          <div
-            className="rounded-2xl overflow-hidden"
-            style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
-          >
+          <BentoCard delay={60} noPad style={{ overflow: 'hidden' }}>
 
             {tab === 'Overview' && (
               <div className="p-6 space-y-5">
@@ -953,7 +877,7 @@ export default function ATMDetail() {
                 )}
               </div>
             )}
-          </div>
+          </BentoCard>
         </>
       )}
     </div>
