@@ -948,6 +948,226 @@ function LandingPage() {
   );
 }
 
+// ─── CARD SWIPE ANIMATION ─────────────────────────────────────────────────────
+function CardSwipeAnimation() {
+  return (
+    <div style={{ width: '100%', maxWidth: 420, margin: '0 auto', position: 'relative' }}>
+      <style>{`
+        /* ── Card Swipe Keyframes ── */
+        @keyframes cs-card-enter {
+          0%   { transform: translate(86px, -60px) rotate(-8deg); opacity: 0; }
+          15%  { opacity: 1; }
+          35%  { transform: translate(86px, 68px) rotate(-2deg); }
+          50%  { transform: translate(86px, 98px) rotate(0deg); }
+          58%  { transform: translate(86px, 98px) rotate(0deg); }
+          72%  { transform: translate(86px, 68px) rotate(-1deg); }
+          85%  { transform: translate(86px, -30px) rotate(-6deg); }
+          92%  { opacity: 1; }
+          100% { transform: translate(86px, -60px) rotate(-8deg); opacity: 0; }
+        }
+        @keyframes cs-chip-glow {
+          0%, 30%  { filter: drop-shadow(0 0 0px rgba(232,175,72,0)); }
+          42%, 56% { filter: drop-shadow(0 0 8px rgba(232,175,72,0.8)) drop-shadow(0 0 3px rgba(254,234,165,0.5)); }
+          70%, 100%{ filter: drop-shadow(0 0 0px rgba(232,175,72,0)); }
+        }
+        @keyframes cs-screen-pulse {
+          0%, 35%  { fill: rgba(196,151,70,0.06); }
+          48%      { fill: rgba(196,151,70,0.18); }
+          56%      { fill: rgba(74,222,128,0.15); }
+          72%, 100%{ fill: rgba(196,151,70,0.06); }
+        }
+        @keyframes cs-screen-text {
+          0%, 42%  { opacity: 0; }
+          50%      { opacity: 1; }
+          70%      { opacity: 1; }
+          78%, 100%{ opacity: 0; }
+        }
+        @keyframes cs-receipt-unroll {
+          0%, 55%  { transform: scaleY(0); opacity: 0; }
+          60%      { opacity: 1; }
+          78%      { transform: scaleY(1); opacity: 1; }
+          92%      { transform: scaleY(1); opacity: 1; }
+          100%     { transform: scaleY(0); opacity: 0; }
+        }
+        @keyframes cs-check-pop {
+          0%, 68%  { transform: translate(148px, -32px) scale(0); opacity: 0; }
+          74%      { transform: translate(148px, -32px) scale(1.25); opacity: 1; }
+          78%      { transform: translate(148px, -32px) scale(0.95); opacity: 1; }
+          82%      { transform: translate(148px, -32px) scale(1); opacity: 1; }
+          92%      { transform: translate(148px, -32px) scale(1); opacity: 1; }
+          100%     { transform: translate(148px, -32px) scale(0); opacity: 0; }
+        }
+        @keyframes cs-check-ring {
+          0%, 68%  { r: 0; opacity: 0; stroke-dashoffset: 88; }
+          74%      { r: 14; opacity: 1; stroke-dashoffset: 88; }
+          82%      { stroke-dashoffset: 0; }
+          92%      { r: 14; opacity: 1; stroke-dashoffset: 0; }
+          100%     { r: 14; opacity: 0; stroke-dashoffset: 0; }
+        }
+        @keyframes cs-slot-flash {
+          0%, 30%  { opacity: 0; }
+          40%, 55% { opacity: 1; }
+          65%, 100%{ opacity: 0; }
+        }
+        @keyframes cs-shadow-pulse {
+          0%, 35%  { opacity: 0.12; rx: 48; }
+          50%      { opacity: 0.22; rx: 52; }
+          70%, 100%{ opacity: 0.12; rx: 48; }
+        }
+        @keyframes cs-float {
+          0%, 100% { transform: translateY(0px); }
+          50%      { transform: translateY(-6px); }
+        }
+        .cs-anim { animation: cs-float 6s ease-in-out infinite; }
+      `}</style>
+
+      <svg viewBox="0 0 320 340" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: 'auto', display: 'block' }}>
+        <defs>
+          <linearGradient id="cs-body" x1="80" y1="60" x2="240" y2="280">
+            <stop offset="0%" stopColor="rgba(196,151,70,0.12)" />
+            <stop offset="100%" stopColor="rgba(196,151,70,0.04)" />
+          </linearGradient>
+          <linearGradient id="cs-body-edge" x1="80" y1="60" x2="80" y2="280">
+            <stop offset="0%" stopColor="rgba(196,151,70,0.25)" />
+            <stop offset="100%" stopColor="rgba(196,151,70,0.08)" />
+          </linearGradient>
+          <linearGradient id="cs-card-grad" x1="0" y1="0" x2="108" y2="68">
+            <stop offset="0%" stopColor="rgba(232,175,72,0.35)" />
+            <stop offset="100%" stopColor="rgba(196,151,70,0.15)" />
+          </linearGradient>
+          <linearGradient id="cs-receipt-grad" x1="130" y1="30" x2="130" y2="100">
+            <stop offset="0%" stopColor="rgba(254,234,165,0.12)" />
+            <stop offset="100%" stopColor="rgba(254,234,165,0.04)" />
+          </linearGradient>
+          <filter id="cs-glow">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
+        <g className="cs-anim">
+          {/* ── Ground shadow ── */}
+          <ellipse cx="160" cy="295" rx="48" ry="8" fill="rgba(196,151,70,0.12)" style={{ animation: 'cs-shadow-pulse 5s ease-in-out infinite' }} />
+
+          {/* ── Machine body ── */}
+          <rect x="96" y="80" width="128" height="200" rx="16" fill="url(#cs-body)" stroke="url(#cs-body-edge)" strokeWidth="1" />
+          {/* Top specular edge */}
+          <line x1="108" y1="80.5" x2="212" y2="80.5" stroke="rgba(196,151,70,0.3)" strokeWidth="0.5" />
+          {/* Inner bevel */}
+          <rect x="100" y="84" width="120" height="192" rx="13" fill="none" stroke="rgba(196,151,70,0.06)" strokeWidth="0.5" />
+
+          {/* ── Receipt printer slot (top) ── */}
+          <rect x="124" y="78" width="72" height="6" rx="3" fill="rgba(0,0,0,0.5)" stroke="rgba(196,151,70,0.15)" strokeWidth="0.5" />
+
+          {/* ── Screen ── */}
+          <rect x="114" y="100" width="92" height="56" rx="6" fill="rgba(196,151,70,0.06)" stroke="rgba(196,151,70,0.15)" strokeWidth="0.5" style={{ animation: 'cs-screen-pulse 5s ease-in-out infinite' }} />
+          {/* Screen content lines (idle) */}
+          <rect x="124" y="112" width="42" height="3" rx="1.5" fill="rgba(196,151,70,0.15)" />
+          <rect x="124" y="120" width="62" height="2" rx="1" fill="rgba(196,151,70,0.08)" />
+          <rect x="124" y="127" width="52" height="2" rx="1" fill="rgba(196,151,70,0.08)" />
+          <rect x="124" y="134" width="30" height="2" rx="1" fill="rgba(196,151,70,0.06)" />
+          {/* Screen success text */}
+          <g style={{ animation: 'cs-screen-text 5s ease-in-out infinite' }}>
+            <text x="160" y="123" textAnchor="middle" fill="rgba(74,222,128,0.8)" fontSize="9" fontWeight="700" fontFamily="monospace">APPROVED</text>
+            <text x="160" y="137" textAnchor="middle" fill="rgba(196,151,70,0.45)" fontSize="6.5" fontFamily="monospace">Transaction OK</text>
+            <rect x="143" y="143" width="34" height="5" rx="2.5" fill="rgba(74,222,128,0.15)" stroke="rgba(74,222,128,0.3)" strokeWidth="0.5" />
+            <text x="160" y="147.2" textAnchor="middle" fill="rgba(74,222,128,0.7)" fontSize="4" fontWeight="600" fontFamily="monospace">SUCCESS</text>
+          </g>
+
+          {/* ── Keypad ── */}
+          {[0,1,2].map(row => [0,1,2].map(col => (
+            <rect key={`k${row}${col}`} x={124 + col * 24} y={170 + row * 20} width={18} height={14} rx={4}
+              fill="rgba(196,151,70,0.04)" stroke="rgba(196,151,70,0.12)" strokeWidth="0.5" />
+          )))}
+          {/* Key labels */}
+          {['1','2','3','4','5','6','7','8','9'].map((n, i) => (
+            <text key={`kl${i}`} x={133 + (i % 3) * 24} y={181 + Math.floor(i / 3) * 20} textAnchor="middle" fill="rgba(196,151,70,0.2)" fontSize="7" fontFamily="monospace">{n}</text>
+          ))}
+          {/* Bottom row: *, 0, # */}
+          <rect x="124" y="230" width="18" height="14" rx="4" fill="rgba(196,151,70,0.04)" stroke="rgba(196,151,70,0.12)" strokeWidth="0.5" />
+          <rect x="148" y="230" width="18" height="14" rx="4" fill="rgba(196,151,70,0.04)" stroke="rgba(196,151,70,0.12)" strokeWidth="0.5" />
+          <rect x="172" y="230" width="18" height="14" rx="4" fill="rgba(74,222,128,0.06)" stroke="rgba(74,222,128,0.2)" strokeWidth="0.5" />
+          <text x="133" y="241" textAnchor="middle" fill="rgba(196,151,70,0.18)" fontSize="7" fontFamily="monospace">*</text>
+          <text x="157" y="241" textAnchor="middle" fill="rgba(196,151,70,0.18)" fontSize="7" fontFamily="monospace">0</text>
+          <text x="181" y="240.5" textAnchor="middle" fill="rgba(74,222,128,0.4)" fontSize="7" fontWeight="700" fontFamily="monospace">OK</text>
+
+          {/* ── Card slot (right side) ── */}
+          <rect x="224" y="130" width="8" height="50" rx="4" fill="rgba(0,0,0,0.6)" stroke="rgba(196,151,70,0.12)" strokeWidth="0.5" />
+          {/* Slot inner glow on swipe */}
+          <rect x="225" y="132" width="6" height="46" rx="3" fill="rgba(232,175,72,0.25)" style={{ animation: 'cs-slot-flash 5s ease-in-out infinite' }} />
+
+          {/* ── Card reader indicator LEDs ── */}
+          <circle cx="228" cy="124" r="2" fill="rgba(196,151,70,0.15)" stroke="rgba(196,151,70,0.1)" strokeWidth="0.5" />
+          <circle cx="228" cy="186" r="2" fill="rgba(196,151,70,0.15)" stroke="rgba(196,151,70,0.1)" strokeWidth="0.5" />
+
+          {/* ── Machine feet ── */}
+          <rect x="106" y="276" width="16" height="5" rx="2.5" fill="rgba(196,151,70,0.1)" />
+          <rect x="198" y="276" width="16" height="5" rx="2.5" fill="rgba(196,151,70,0.1)" />
+
+          {/* ── ANIMATED: Bank card ── */}
+          <g style={{ animation: 'cs-card-enter 5s cubic-bezier(0.4,0,0.2,1) infinite' }}>
+            {/* Card body */}
+            <rect x="0" y="0" width="108" height="68" rx="8" fill="url(#cs-card-grad)" stroke="rgba(232,175,72,0.35)" strokeWidth="0.8" />
+            {/* Card inner highlight */}
+            <line x1="10" y1="0.4" x2="98" y2="0.4" stroke="rgba(254,234,165,0.2)" strokeWidth="0.4" />
+            {/* Smart chip */}
+            <g style={{ animation: 'cs-chip-glow 5s ease-in-out infinite' }}>
+              <rect x="16" y="18" width="22" height="16" rx="3" fill="rgba(232,175,72,0.25)" stroke="rgba(232,175,72,0.5)" strokeWidth="0.6" />
+              {/* Chip contacts */}
+              <line x1="20" y1="23" x2="34" y2="23" stroke="rgba(232,175,72,0.35)" strokeWidth="0.4" />
+              <line x1="20" y1="26" x2="34" y2="26" stroke="rgba(232,175,72,0.35)" strokeWidth="0.4" />
+              <line x1="20" y1="29" x2="34" y2="29" stroke="rgba(232,175,72,0.35)" strokeWidth="0.4" />
+              <line x1="27" y1="19" x2="27" y2="33" stroke="rgba(232,175,72,0.25)" strokeWidth="0.3" />
+            </g>
+            {/* Card number dots */}
+            {[0,1,2,3].map(g => [0,1,2,3].map(d => (
+              <circle key={`d${g}${d}`} cx={18 + g * 22 + d * 4.5} cy={44} r={1.2} fill="rgba(254,234,165,0.18)" />
+            )))}
+            {/* Card brand line */}
+            <rect x="68" y="14" width="28" height="10" rx="3" fill="rgba(254,234,165,0.06)" stroke="rgba(254,234,165,0.12)" strokeWidth="0.3" />
+            <text x="82" y="22" textAnchor="middle" fill="rgba(254,234,165,0.2)" fontSize="5" fontWeight="700" fontFamily="monospace">BANK</text>
+            {/* Cardholder name area */}
+            <rect x="16" y="52" width="44" height="3" rx="1.5" fill="rgba(254,234,165,0.1)" />
+            <rect x="16" y="58" width="28" height="2" rx="1" fill="rgba(254,234,165,0.06)" />
+            {/* Exp date */}
+            <text x="82" y="56" textAnchor="middle" fill="rgba(254,234,165,0.12)" fontSize="4.5" fontFamily="monospace">VALID</text>
+            <text x="82" y="62" textAnchor="middle" fill="rgba(254,234,165,0.2)" fontSize="5.5" fontFamily="monospace">12/28</text>
+          </g>
+
+          {/* ── ANIMATED: Receipt ── */}
+          <g style={{ transformOrigin: '160px 78px', animation: 'cs-receipt-unroll 5s ease-out infinite' }}>
+            {/* Receipt paper */}
+            <rect x="130" y="24" width="60" height="56" rx="2" fill="url(#cs-receipt-grad)" stroke="rgba(254,234,165,0.15)" strokeWidth="0.5" />
+            {/* Dashed cut line at top */}
+            <line x1="134" y1="28" x2="186" y2="28" stroke="rgba(196,151,70,0.2)" strokeWidth="0.4" strokeDasharray="3 2" />
+            {/* Receipt content */}
+            <text x="160" y="37" textAnchor="middle" fill="rgba(254,234,165,0.5)" fontSize="5" fontWeight="700" fontFamily="monospace">PAYGUARD</text>
+            <line x1="138" y1="40" x2="182" y2="40" stroke="rgba(196,151,70,0.1)" strokeWidth="0.3" />
+            <rect x="138" y="44" width="32" height="2" rx="1" fill="rgba(254,234,165,0.1)" />
+            <rect x="138" y="49" width="44" height="1.5" rx="0.75" fill="rgba(254,234,165,0.07)" />
+            <rect x="138" y="53" width="38" height="1.5" rx="0.75" fill="rgba(254,234,165,0.07)" />
+            <rect x="138" y="57" width="24" height="1.5" rx="0.75" fill="rgba(254,234,165,0.05)" />
+            <text x="160" y="66" textAnchor="middle" fill="rgba(74,222,128,0.45)" fontSize="4.5" fontWeight="600" fontFamily="monospace">APPROVED</text>
+            {/* Dashed cut line at bottom */}
+            <line x1="134" y1="72" x2="186" y2="72" stroke="rgba(196,151,70,0.15)" strokeWidth="0.4" strokeDasharray="3 2" />
+            {/* Barcode */}
+            {[0,1,2,3,4,5,6,7,8,9,10,11].map(i => (
+              <rect key={`bc${i}`} x={141 + i * 3.2} y={74} width={i % 3 === 0 ? 2 : 1.2} height="4" rx="0.3" fill={`rgba(254,234,165,${i % 2 === 0 ? 0.12 : 0.06})`} />
+            ))}
+          </g>
+
+          {/* ── ANIMATED: Success checkmark ── */}
+          <g style={{ animation: 'cs-check-pop 5s cubic-bezier(0.34,1.56,0.64,1) infinite' }} filter="url(#cs-glow)">
+            <circle cx="0" cy="0" r="14" fill="rgba(74,222,128,0.12)" stroke="rgba(74,222,128,0.6)" strokeWidth="1.5"
+              strokeDasharray="88" style={{ animation: 'cs-check-ring 5s ease-out infinite' }} />
+            <path d="M-5 0 L-1.5 4 L6 -4" fill="none" stroke="rgba(74,222,128,0.9)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          </g>
+        </g>
+      </svg>
+    </div>
+  );
+}
+
 // ─── LOGIN PAGE ───────────────────────────────────────────────────────────────
 function LoginRibbons() {
   return (
@@ -1143,8 +1363,8 @@ function LoginPage() {
       </div>
 
       {/* ── MAIN CONTENT ── */}
-      <div className="relative z-10 flex-1 flex items-center justify-start px-6 md:px-10 lg:px-16" style={{ paddingTop:'clamp(1.25rem,3vh,2.5rem)', paddingBottom:'clamp(1.25rem,3vh,2.5rem)' }}>
-        <div className="w-full max-w-xl">
+      <div className="relative z-10 flex-1 flex items-center justify-center px-6 md:px-10 lg:px-16" style={{ paddingTop:'clamp(1.25rem,3vh,2.5rem)', paddingBottom:'clamp(1.25rem,3vh,2.5rem)' }}>
+        <div className="w-full" style={{ maxWidth: 960 }}>
 
           {/* Big heading above card */}
           <motion.div initial={{ opacity:0,y:30 }} animate={{ opacity:1,y:0 }} transition={{ duration:0.8, ease:[0.16,1,0.3,1] }}
@@ -1157,20 +1377,21 @@ function LoginPage() {
             </p>
           </motion.div>
 
-          {/* Glass login card */}
+          {/* Glass login card — side by side */}
           <motion.div
             initial={{ opacity:0, y:32, scale:0.96 }}
             animate={{ opacity:1, y:0,  scale:1   }}
             transition={{ duration:0.85, ease:[0.16,1,0.3,1], delay:0.1 }}
             className={`relative rounded-3xl ${shake?'lp-shake':''}`}
-            style={{ background:'rgba(9,9,9,0.82)', backdropFilter:'blur(60px) saturate(240%) brightness(1.04)', WebkitBackdropFilter:'blur(60px) saturate(240%) brightness(1.04)', border:'1px solid rgba(196,151,70,0.18)', boxShadow:'inset 0 1px 0 rgba(196,151,70,0.14), inset 0 -1px 0 rgba(0,0,0,0.18), inset 1px 0 0 rgba(196,151,70,0.06), 0 40px 80px rgba(0,0,0,0.92), 0 0 0 0.5px rgba(196,151,70,0.08)' }}>
+            style={{ background:'rgba(9,9,9,0.82)', backdropFilter:'blur(60px) saturate(240%) brightness(1.04)', WebkitBackdropFilter:'blur(60px) saturate(240%) brightness(1.04)', border:'1px solid rgba(196,151,70,0.18)', boxShadow:'inset 0 1px 0 rgba(196,151,70,0.14), inset 0 -1px 0 rgba(0,0,0,0.18), inset 1px 0 0 rgba(196,151,70,0.06), 0 40px 80px rgba(0,0,0,0.92), 0 0 0 0.5px rgba(196,151,70,0.08)', display:'flex', flexDirection:'row', overflow:'hidden' }}>
 
             {/* Specular top line */}
             <div className="absolute inset-x-0 top-0 pointer-events-none rounded-t-3xl" style={{ height:'1px', background:'linear-gradient(90deg,transparent 5%,rgba(196,151,70,0.22) 50%,transparent 95%)', zIndex:2 }} />
             {/* Specular left edge */}
             <div className="absolute inset-y-0 left-0 pointer-events-none rounded-l-3xl" style={{ width:'1px', background:'linear-gradient(180deg,rgba(196,151,70,0.12),rgba(196,151,70,0.04),transparent)', zIndex:2 }} />
 
-            <div style={{ padding:'clamp(1.5rem,2.5vw,2rem)' }}>
+            {/* LEFT: Form */}
+            <div style={{ flex:'1 1 0', padding:'clamp(1.5rem,2.5vw,2rem)', minWidth:0 }}>
 
               {/* Form header */}
               <div style={{ marginBottom:'1.4rem' }}>
@@ -1270,6 +1491,16 @@ function LoginPage() {
 
                 {error && <p className="text-center" style={{ color:'rgba(255,110,110,0.95)', fontSize:'0.88rem' }}>{error}</p>}
               </form>
+            </div>
+
+            {/* RIGHT: Card Swipe Animation — hidden on small screens */}
+            <div className="hidden lg:flex" style={{ flex:'0 0 340px', alignItems:'center', justifyContent:'center', borderLeft:'1px solid rgba(196,151,70,0.1)', background:'rgba(196,151,70,0.015)', position:'relative', overflow:'hidden' }}>
+              {/* Ambient glow behind animation */}
+              <div className="absolute pointer-events-none" style={{ top:'15%', left:'10%', width:'80%', height:'70%', background:'radial-gradient(circle, rgba(196,151,70,0.06) 0%, transparent 70%)', filter:'blur(30px)' }} />
+              <div style={{ position:'relative', zIndex:1, padding:'1.5rem 0.5rem' }}>
+                <CardSwipeAnimation />
+                <p className="text-center font-mono" style={{ color:'rgba(196,151,70,0.3)', fontSize:'0.6rem', letterSpacing:'0.15em', marginTop:'0.5rem', textTransform:'uppercase' }}>Secure Payment Processing</p>
+              </div>
             </div>
           </motion.div>
 

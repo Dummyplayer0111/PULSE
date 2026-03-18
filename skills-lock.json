@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "skills": {
+    "add-expert": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "computedHash": "c81e4d1028e2e71d7431a12b5b87ab24fa66d348048d6928c37f9bdf3ec046a1"
+    },
+    "add-sfx": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "computedHash": "d87f8578c7cfa0bf84761f1a85a3bb43e9c63d2a3507dcdcc96ec790f0b4a170"
+    },
+    "docs-demo": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "computedHash": "ffada361c85f16ff4cc7189dd27a441435aa012a4914477d70573c43fdbe47c0"
+    },
+    "make-pr": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "computedHash": "7eb4600e06d78f2c027bbceb72561de92188ea717d9a91ad9a123511aa6a8e16"
+    },
+    "video-report": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "computedHash": "b5cf9b7014112c070736b6d935fb6babf80eb9acec8363d9adc2e69ae9f50136"
+    },
+    "web-renderer-test": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "computedHash": "c5edfba5d68d897b3cdf9b208db16f99506d84852ef50a192c55b216cc18a2cf"
+    },
+    "writing-docs": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "computedHash": "d93e46f86c4218e1b43a7eb4256375e1ed1dbefdd78cc54e668eac7e9b9816be"
+    }
+  }
+}
