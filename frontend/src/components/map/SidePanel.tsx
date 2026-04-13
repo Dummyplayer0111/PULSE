@@ -114,7 +114,7 @@ export default function SidePanel({ atm, onClose }: SidePanelProps) {
       <div className="px-5 py-4 space-y-3" style={{ borderBottom: '1px solid var(--p-card-border)' }}>
         <ScoreBar label="Network"     value={atm.networkScore}     />
         <ScoreBar label="Hardware"    value={atm.hardwareScore}    />
-        <ScoreBar label="Software"    value={atm.softwareScore}    />
+        <ScoreBar label="Uptime"      value={atm.softwareScore}    />
         <ScoreBar label="Transaction" value={atm.transactionScore} />
       </div>
 

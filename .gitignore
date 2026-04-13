@@ -30,3 +30,8 @@ $RECYCLE.BIN/
 .vscode/
 .history/
 *.code-workspace
+
+# Claude / AI agent
+.claude/
+.agent/
+.agents/

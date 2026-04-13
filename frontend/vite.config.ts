@@ -11,6 +11,8 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
       },
       plugins: [react(), tailwindcss()],
+      // WARNING: Keys injected here are embedded in the client bundle and visible
+      // to anyone in the browser. Move to a backend proxy for production use.
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)

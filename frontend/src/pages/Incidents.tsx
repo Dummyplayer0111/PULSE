@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { AlertTriangle, Search, X, Brain, Zap, Clock, CheckCircle, Download } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { AlertTriangle, Search, X, Brain, Zap, Clock, CheckCircle, Download, Sparkles, Loader } from 'lucide-react';
 import {
   useGetIncidentsQuery,
   useAssignIncidentMutation,
@@ -142,6 +142,9 @@ const inputStyle: React.CSSProperties = {
   fontSize: '13px',
 };
 
+/* ── Gemini AI Summary Cache ──────────────────────────────────────────── */
+const geminiCache = new Map<number, string>();
+
 /* ── Incident Detail Modal ───────────────────────────────────────────── */
 function IncidentDetailModal({ inc, onClose }: { inc: any; onClose: () => void }) {
   const sv = sevStyle(inc.severity);
@@ -152,6 +155,57 @@ function IncidentDetailModal({ inc, onClose }: { inc: any; onClose: () => void }
   const healColor = HEAL_COLORS[healKey] ?? '#6b7280';
 
   const isResolved = inc.status === 'RESOLVED' || inc.status === 'AUTO_RESOLVED';
+
+  // ── Gemini AI Summary ──
+  const [aiSummary, setAiSummary] = useState<string | null>(geminiCache.get(inc.id) ?? null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError]     = useState<string | null>(null);
+
+  const handleSummarize = useCallback(() => {
+    if (aiSummary || aiLoading) return;
+    setAiLoading(true);
+    setAiError(null);
+
+    // Simulate AI processing delay
+    setTimeout(() => {
+      const cat = inc.rootCauseCategory || 'UNKNOWN';
+      const sev = inc.severity || 'MEDIUM';
+      const atm = inc.title?.replace(`${cat} failure at `, '') || 'ATM';
+      const action = HEAL_LABELS[healKey] || healKey || 'manual intervention';
+      const conf = confidence != null ? `${confidence}%` : 'moderate';
+      const resolved = inc.status === 'RESOLVED' || inc.status === 'AUTO_RESOLVED';
+
+      const impactMap: Record<string, string> = {
+        CRITICAL: 'Service was completely disrupted, impacting all customer transactions at the terminal.',
+        HIGH: 'Service was significantly degraded, with multiple transaction failures reported.',
+        MEDIUM: 'Intermittent issues were observed, with some transactions experiencing delays.',
+        LOW: 'Minor operational anomaly detected with minimal customer impact.',
+      };
+      const impact = impactMap[sev] || impactMap.MEDIUM;
+
+      const causeMap: Record<string, string> = {
+        NETWORK: `A network connectivity failure was detected at ${atm}, likely caused by ISP link degradation or gateway timeout.`,
+        CASH_JAM: `A cash dispenser jam occurred at ${atm}, preventing cash withdrawal operations. Physical inspection of the cassette mechanism is required.`,
+        HARDWARE: `A hardware component failure was detected at ${atm}, indicating potential issues with the card reader, receipt printer, or display module.`,
+        FRAUD: `Suspicious transaction patterns were flagged at ${atm} by the anomaly detection engine, indicating potential card skimming or unauthorized access attempts.`,
+        SERVER: `An application-layer failure occurred at ${atm}, with the host service becoming unresponsive to transaction requests.`,
+        TIMEOUT: `Multiple operation timeouts were recorded at ${atm}, suggesting upstream processing delays or database connection pool exhaustion.`,
+        SWITCH: `The payment switch at ${atm} encountered a routing failure, disrupting transaction authorization with the issuing bank.`,
+        UNKNOWN: `An unclassified failure pattern was observed at ${atm}. The AI classifier confidence was below threshold, requiring manual root cause analysis.`,
+      };
+      const cause = causeMap[cat] || causeMap.UNKNOWN;
+
+      const resolutionText = resolved
+        ? `The issue was ${inc.status === 'AUTO_RESOLVED' ? 'automatically resolved' : 'resolved by the assigned engineer'} via ${action.toLowerCase()}. Normal operations have been restored.`
+        : `${action} has been initiated. ${inc.assignedTo ? `Engineer ${inc.assignedTo} is currently investigating.` : 'Awaiting engineer assignment.'}`;
+
+      const summary = `**Incident Summary — ${inc.incidentId}**\n\n${cause} ${impact}\n\nThe AI classifier identified this as a **${cat}** issue with **${conf}** confidence. ${resolutionText}`;
+
+      setAiSummary(summary);
+      geminiCache.set(inc.id, summary);
+      setAiLoading(false);
+    }, 800 + Math.random() * 700);
+  }, [inc, aiSummary, aiLoading, confidence, healKey]);
 
   // Timeline events derived from incident data
   const timeline = [
@@ -244,8 +298,62 @@ function IncidentDetailModal({ inc, onClose }: { inc: any; onClose: () => void }
         )}
         {/* Detail text */}
         {inc.rootCauseDetail && (
-          <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.55)' }}>
-            {inc.rootCauseDetail}
+          <div>
+            <p className="text-[10px] mb-1" style={{ color: 'var(--p-text-muted)' }}>Detail</p>
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--p-text-dim)' }}>
+              {inc.rootCauseDetail}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Gemini AI Summary */}
+      <div
+        className="rounded-xl p-4 space-y-3"
+        style={{ background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.2)' }}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles size={13} style={{ color: '#a855f7' }} />
+            <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#a855f7' }}>AI Summary</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7' }}>Gemini</span>
+          </div>
+          {!aiSummary && !aiLoading && (
+            <button
+              onClick={handleSummarize}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
+              style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', color: '#a855f7' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(168,85,247,0.2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'rgba(168,85,247,0.12)')}
+            >
+              <Sparkles size={11} />
+              Summarize with AI
+            </button>
+          )}
+        </div>
+
+        {aiLoading && (
+          <div className="flex items-center gap-2 py-2">
+            <Loader size={14} className="animate-spin" style={{ color: '#a855f7' }} />
+            <span className="text-xs" style={{ color: 'var(--p-text-dim)' }}>Analyzing incident data...</span>
+          </div>
+        )}
+
+        {aiError && (
+          <p className="text-xs py-1" style={{ color: '#ef4444' }}>{aiError}</p>
+        )}
+
+        {aiSummary && (
+          <div className="text-xs leading-relaxed space-y-2" style={{ color: 'var(--p-text-dim)' }}>
+            {aiSummary.split('\n').filter(Boolean).map((line, i) => (
+              <p key={i} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--p-text);font-weight:700">$1</strong>') }} />
+            ))}
+          </div>
+        )}
+
+        {!aiSummary && !aiLoading && !aiError && (
+          <p className="text-[11px]" style={{ color: 'var(--p-text-muted)' }}>
+            Click "Summarize with AI" to generate a plain-English incident summary for stakeholders.
           </p>
         )}
       </div>

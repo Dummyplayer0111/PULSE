@@ -1,3 +1,4 @@
+import logging
 import uuid
 import os
 import threading
@@ -8,10 +9,13 @@ import hashlib
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db.models import Avg, Count
+from django.db.models.functions import TruncHour
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     ATM, Alert, AnomalyFlag, CustomerNotification, HealthSnapshot,
@@ -413,7 +417,152 @@ def dashboard_summary(request):
 
 
 @api_view(['GET'])
+def sla_metrics(request):
+    """SLA metrics: MTTA, MTTR, breach counts, zero-touch rate."""
+    from datetime import timedelta as _td
+    from django.db.models import F, ExpressionWrapper, DurationField, Avg
+
+    now = timezone.now()
+    thirty_days_ago = now - _td(days=30)
+    seven_days_ago = now - _td(days=7)
+
+    all_incidents = Incident.objects.filter(createdAt__gte=thirty_days_ago)
+    recent_incidents = Incident.objects.filter(createdAt__gte=seven_days_ago)
+
+    # MTTA: avg time from createdAt to acknowledgedAt (acknowledged incidents only)
+    acked = all_incidents.filter(acknowledgedAt__isnull=False)
+    if acked.exists():
+        mtta_avg = acked.annotate(
+            tta=ExpressionWrapper(F('acknowledgedAt') - F('createdAt'), output_field=DurationField())
+        ).aggregate(avg=Avg('tta'))['avg']
+        mtta_seconds = mtta_avg.total_seconds() if mtta_avg else 0
+    else:
+        mtta_seconds = 0
+
+    # MTTR: avg time from createdAt to resolvedAt (resolved incidents only)
+    resolved = all_incidents.filter(resolvedAt__isnull=False)
+    if resolved.exists():
+        mttr_avg = resolved.annotate(
+            ttr=ExpressionWrapper(F('resolvedAt') - F('createdAt'), output_field=DurationField())
+        ).aggregate(avg=Avg('ttr'))['avg']
+        mttr_seconds = mttr_avg.total_seconds() if mttr_avg else 0
+    else:
+        mttr_seconds = 0
+
+    # SLA breach: MTTA > 15min or MTTR > 4h
+    SLA_MTTA_LIMIT = _td(minutes=15)
+    SLA_MTTR_LIMIT = _td(hours=4)
+
+    mtta_breaches = acked.annotate(
+        tta=ExpressionWrapper(F('acknowledgedAt') - F('createdAt'), output_field=DurationField())
+    ).filter(tta__gt=SLA_MTTA_LIMIT).count()
+
+    mttr_breaches = resolved.annotate(
+        ttr=ExpressionWrapper(F('resolvedAt') - F('createdAt'), output_field=DurationField())
+    ).filter(ttr__gt=SLA_MTTR_LIMIT).count()
+
+    # Zero-touch resolution rate
+    total_count = all_incidents.count()
+    auto_resolved = all_incidents.filter(status='AUTO_RESOLVED').count()
+    zero_touch_rate = round((auto_resolved / max(total_count, 1)) * 100, 1)
+
+    # Weekly comparison
+    prev_week = Incident.objects.filter(
+        createdAt__gte=seven_days_ago - _td(days=7),
+        createdAt__lt=seven_days_ago,
+    )
+    prev_total = prev_week.count()
+    prev_auto = prev_week.filter(status='AUTO_RESOLVED').count()
+    prev_zero_touch = round((prev_auto / max(prev_total, 1)) * 100, 1)
+
+    return Response({
+        "mttaSeconds": round(mtta_seconds, 1),
+        "mttrSeconds": round(mttr_seconds, 1),
+        "mttaBreaches": mtta_breaches,
+        "mttrBreaches": mttr_breaches,
+        "totalIncidents30d": total_count,
+        "autoResolved30d": auto_resolved,
+        "zeroTouchRate": zero_touch_rate,
+        "prevWeekZeroTouchRate": prev_zero_touch,
+    })
+
+
+@api_view(['GET'])
+def dashboard_trends(request):
+    """Week-over-week deltas for dashboard metric cards."""
+    from datetime import timedelta as _td
+
+    now = timezone.now()
+    this_week_start = now - _td(days=7)
+    prev_week_start = this_week_start - _td(days=7)
+
+    # This week
+    tw_incidents = Incident.objects.filter(createdAt__gte=this_week_start)
+    tw_open = tw_incidents.filter(status__in=['OPEN', 'INVESTIGATING']).count()
+    tw_critical = tw_incidents.filter(severity='CRITICAL').count()
+    tw_anomalies = AnomalyFlag.objects.filter(createdAt__gte=this_week_start).count()
+
+    # Prev week
+    pw_incidents = Incident.objects.filter(createdAt__gte=prev_week_start, createdAt__lt=this_week_start)
+    pw_open = pw_incidents.filter(status__in=['OPEN', 'INVESTIGATING']).count()
+    pw_critical = pw_incidents.filter(severity='CRITICAL').count()
+    pw_anomalies = AnomalyFlag.objects.filter(createdAt__gte=prev_week_start, createdAt__lt=this_week_start).count()
+
+    # Health sparkline: avg health per hour for the last 24h (2 queries instead of 48)
+    twenty_four_ago = now - _td(hours=24)
+    health_by_hour = dict(
+        HealthSnapshot.objects.filter(timestamp__gte=twenty_four_ago)
+        .annotate(hour=TruncHour('timestamp'))
+        .values('hour')
+        .annotate(avg_health=Avg('healthScore'))
+        .values_list('hour', 'avg_health')
+    )
+    sparkline = []
+    for i in range(24):
+        hour_start = (now - _td(hours=24 - i)).replace(minute=0, second=0, microsecond=0)
+        val = health_by_hour.get(hour_start)
+        sparkline.append(round(val, 1) if val else None)
+
+    # Incident sparkline: incidents created per hour for last 24h
+    inc_by_hour = dict(
+        Incident.objects.filter(createdAt__gte=twenty_four_ago)
+        .annotate(hour=TruncHour('createdAt'))
+        .values('hour')
+        .annotate(cnt=Count('id'))
+        .values_list('hour', 'cnt')
+    )
+    inc_sparkline = []
+    for i in range(24):
+        hour_start = (now - _td(hours=24 - i)).replace(minute=0, second=0, microsecond=0)
+        inc_sparkline.append(inc_by_hour.get(hour_start, 0))
+
+    return Response({
+        "openIncidents":     {"current": tw_open,     "previous": pw_open},
+        "criticalAlerts":    {"current": tw_critical,  "previous": pw_critical},
+        "activeAnomalies":   {"current": tw_anomalies, "previous": pw_anomalies},
+        "healthSparkline":   sparkline,
+        "incidentSparkline": inc_sparkline,
+    })
+
+
+def _derive_status_local(health_score):
+    if health_score < 30: return 'OFFLINE'
+    if health_score < 60: return 'DEGRADED'
+    return 'ONLINE'
+
+def _sync_atm_statuses_local():
+    to_update = []
+    for atm in ATM.objects.exclude(status='MAINTENANCE'):
+        correct = _derive_status_local(atm.healthScore)
+        if atm.status != correct:
+            atm.status = correct
+            to_update.append(atm)
+    if to_update:
+        ATM.objects.bulk_update(to_update, ['status'])
+
+@api_view(['GET'])
 def health_overview(request):
+    _sync_atm_statuses_local()
     atms = list(ATM.objects.all().values(
         'id', 'name', 'location', 'status', 'healthScore',
         'networkScore', 'hardwareScore', 'softwareScore', 'transactionScore',
@@ -514,8 +663,165 @@ def atm_health_history(request, id):
 # SIMULATOR CONTROL
 # ─────────────────────────────────────────────
 
+# ─────────────────────────────────────────────
+# CHAOS INJECTION — on-demand scenario triggers
+# ─────────────────────────────────────────────
+
+_CHAOS_SCENARIOS = {
+    'CASH_JAM': {
+        'name': 'Cash Jam',
+        'description': 'Cash dispenser motor stalls — bills jammed in transport mechanism',
+        'logs': [
+            {'code': 'CASH_DISPENSE_FAIL', 'level': 'WARN',     'msg': 'Cash dispenser vibration sensor triggered — possible paper jam in cassette 2'},
+            {'code': 'CASH_DISPENSE_FAIL', 'level': 'ERROR',    'msg': 'Cash dispenser motor stalled — bills jammed in transport mechanism'},
+            {'code': 'CASH_DISPENSE_FAIL', 'level': 'CRITICAL', 'msg': 'Repeated cash jam detected — cassette 2 unresponsive after 3 retry attempts'},
+        ],
+    },
+    'NETWORK_OUTAGE': {
+        'name': 'Network Outage',
+        'description': 'Switch connection drops — host unreachable after heartbeat failures',
+        'logs': [
+            {'code': 'NETWORK_LATENCY_HIGH', 'level': 'WARN',     'msg': 'Switch connection latency exceeded 5000ms — response degraded'},
+            {'code': 'NETWORK_TIMEOUT',      'level': 'ERROR',    'msg': 'Host unreachable — 3 consecutive heartbeat failures on primary link'},
+            {'code': 'NETWORK_TIMEOUT',      'level': 'CRITICAL', 'msg': 'Complete network isolation — both primary and backup links down'},
+        ],
+    },
+    'FRAUD_ATTEMPT': {
+        'name': 'Fraud / Skimming',
+        'description': 'Card reader anomaly suggests skimmer device — multiple failed PINs from cloned cards',
+        'logs': [
+            {'code': 'CARD_READ_ERROR',    'level': 'WARN',     'msg': 'Magnetic stripe read anomaly — unusual signal pattern on card reader'},
+            {'code': 'CARD_READ_ERROR',    'level': 'ERROR',    'msg': 'Multiple failed PIN attempts from same card hash — potential card cloning'},
+            {'code': 'MALWARE_SIGNATURE',  'level': 'CRITICAL', 'msg': 'Skimmer device signature detected — card reader capacitance out of range'},
+        ],
+    },
+    'HARDWARE_FAILURE': {
+        'name': 'Hardware Failure',
+        'description': 'UPS battery critical — thermal runaway detected in power module',
+        'logs': [
+            {'code': 'UPS_FAILURE',   'level': 'WARN',     'msg': 'UPS battery voltage below threshold — switching to mains backup'},
+            {'code': 'HARDWARE_JAM',  'level': 'ERROR',    'msg': 'Receipt printer paper jam — thermal head temperature exceeding safe limits'},
+            {'code': 'UPS_FAILURE',   'level': 'CRITICAL', 'msg': 'UPS battery critical — thermal runaway detected, initiating emergency shutdown'},
+        ],
+    },
+    'MASS_FAILURE': {
+        'name': 'Mass Failure',
+        'description': 'Upstream switch outage — cascading failures across multiple ATMs',
+        'logs': [
+            {'code': 'NETWORK_TIMEOUT',      'level': 'ERROR',    'msg': 'Upstream switch node unreachable — cascading timeout detected'},
+            {'code': 'NETWORK_TIMEOUT',      'level': 'CRITICAL', 'msg': 'Switch fabric partition — multiple ATM zones affected simultaneously'},
+            {'code': 'CASH_DISPENSE_FAIL',   'level': 'ERROR',    'msg': 'Transaction queue overflow — dispenser locked due to upstream failure'},
+            {'code': 'HARDWARE_JAM',         'level': 'CRITICAL', 'msg': 'Emergency shutdown triggered — unrecoverable state after switch failure'},
+        ],
+    },
+}
+
+
 @api_view(['POST'])
+@permission_classes([AllowAny])  # TODO: restrict to IsAuthenticated in production
+def inject_scenario(request):
+    """
+    Inject a chaos scenario: create realistic log entries that trigger the full
+    pipeline (classify → incident → heal → notify → broadcast).
+
+    POST { "scenario": "CASH_JAM", "atm_id": 3 }   (atm_id optional)
+    """
+    scenario_key = request.data.get('scenario', '').upper()
+    atm_id = request.data.get('atm_id')
+
+    if scenario_key not in _CHAOS_SCENARIOS:
+        return Response({
+            'error': f'Unknown scenario: {scenario_key}',
+            'available': list(_CHAOS_SCENARIOS.keys()),
+        }, status=400)
+
+    from datetime import timedelta as _td
+
+    scenario = _CHAOS_SCENARIOS[scenario_key]
+
+    # Pick target ATM(s)
+    if scenario_key == 'MASS_FAILURE':
+        atms = list(ATM.objects.all()[:4])
+        if len(atms) < 2:
+            atms = list(ATM.objects.all())
+    elif atm_id:
+        try:
+            atms = [ATM.objects.get(id=int(atm_id))]
+        except ATM.DoesNotExist:
+            return Response({'error': f'ATM {atm_id} not found'}, status=404)
+    else:
+        atms = [random.choice(list(ATM.objects.all()))]
+
+    if not atms:
+        return Response({'error': 'No ATMs in database. Run seed first.'}, status=400)
+
+    injected = []
+    now = timezone.now()
+
+    for idx, log_def in enumerate(scenario['logs']):
+        target_atm = atms[idx % len(atms)] if scenario_key == 'MASS_FAILURE' else atms[0]
+        ts = now + _td(seconds=idx * 2)
+
+        raw = f"[{ts.isoformat()}] CHAOS-{scenario_key} {target_atm.name} {log_def['code']}"
+        dedup = hashlib.sha256(raw.encode()).hexdigest()
+
+        if LogEntry.objects.filter(dedupHash=dedup).exists():
+            dedup = hashlib.sha256(f"{raw}-{uuid.uuid4().hex[:8]}".encode()).hexdigest()
+
+        log_entry = LogEntry.objects.create(
+            sourceType='ATM',
+            sourceId=uuid.UUID(int=target_atm.id),
+            timestamp=ts,
+            logLevel=log_def['level'],
+            eventCode=log_def['code'],
+            message=log_def['msg'],
+            rawMessage=raw,
+            dedupHash=dedup,
+        )
+
+        # Run pipeline synchronously for the first log (fast feedback),
+        # background for the rest
+        if idx == 0:
+            process_log(log_entry.id)
+        else:
+            threading.Thread(target=process_log, args=(log_entry.id,), daemon=True).start()
+
+        injected.append({
+            'logId': log_entry.id,
+            'eventCode': log_def['code'],
+            'logLevel': log_def['level'],
+            'atm': target_atm.name,
+            'message': log_def['msg'],
+        })
+
+    return Response({
+        'status': 'injected',
+        'scenario': scenario_key,
+        'name': scenario['name'],
+        'description': scenario['description'],
+        'logsInjected': len(injected),
+        'targetAtms': list({a.name for a in atms}),
+        'logs': injected,
+    })
+
+
+@api_view(['GET'])
 @permission_classes([AllowAny])
+def list_scenarios(request):
+    """Return available chaos scenarios for the frontend."""
+    return Response([
+        {
+            'key': key,
+            'name': s['name'],
+            'description': s['description'],
+            'logCount': len(s['logs']),
+        }
+        for key, s in _CHAOS_SCENARIOS.items()
+    ])
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])  # TODO: restrict to IsAuthenticated in production
 def simulator_start(request):
     global _sim_thread
     with _sim_lock:
@@ -536,7 +842,7 @@ def simulator_start(request):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([AllowAny])  # TODO: restrict to IsAuthenticated in production
 def simulator_stop(request):
     _sim_stop.set()
     with _sim_lock:
@@ -593,19 +899,28 @@ def recent_pipeline_events(request):
     """
     REST fallback for the Live Pipeline Feed.
     Returns the 40 most recent log entries joined with their incident + self-heal data.
-    Used because InMemoryChannelLayer doesn't reliably cross thread boundaries.
+    Batch-fetches incidents and self-heal actions (3 queries instead of ~80).
     """
-    logs = LogEntry.objects.order_by('-timestamp')[:40]
+    logs = list(LogEntry.objects.order_by('-timestamp')[:40])
+    if not logs:
+        return Response([])
+
+    # Batch-fetch incidents by triggeringLogId
+    log_uuids = [uuid.UUID(int=log.id) for log in logs]
+    incidents = Incident.objects.filter(triggeringLogId__in=log_uuids)
+    inc_map = {inc.triggeringLogId: inc for inc in incidents}
+
+    # Batch-fetch self-heal actions for those incidents
+    inc_uuids = [uuid.UUID(int=inc.id) for inc in incidents]
+    heals = SelfHealAction.objects.filter(incidentId__in=inc_uuids, triggeredBy='AUTO')
+    heal_map = {h.incidentId: h for h in heals}
+
     result = []
     for log in logs:
         try:
             log_uuid = uuid.UUID(int=log.id)
-            incident = Incident.objects.filter(triggeringLogId=log_uuid).first()
-            heal = None
-            if incident:
-                heal = SelfHealAction.objects.filter(
-                    incidentId=uuid.UUID(int=incident.id), triggeredBy='AUTO'
-                ).first()
+            incident = inc_map.get(log_uuid)
+            heal = heal_map.get(uuid.UUID(int=incident.id)) if incident else None
             result.append({
                 'type': 'pipeline_event',
                 'log': {
@@ -632,8 +947,8 @@ def recent_pipeline_events(request):
                 'selfHealAction': heal.actionType if heal else None,
                 'timestamp':      log.timestamp.isoformat(),
             })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Pipeline event build failed for log %s: %s", log.id, e)
     return Response(result)
 
 
@@ -656,7 +971,7 @@ def channel_detail(request, id):
 # ─────────────────────────────────────────────
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([AllowAny])  # TODO: restrict to IsAuthenticated in production
 def log_ingest(request):
     """
     Ingest a single log entry, then kick off the full pipeline
@@ -742,7 +1057,22 @@ def incident_list(request):
         qs = qs.filter(assignedTo=assigned_to)
     if status:
         qs = qs.filter(status=status)
-    return Response(list(qs.values()))
+
+    incidents = list(qs[:200].values())
+
+    # Batch-fetch ATMs to avoid N+1 queries
+    source_ids = {inc['sourceId'] for inc in incidents if inc.get('sourceId')}
+    atm_map = {}
+    for atm in ATM.objects.filter(id__in=[sid.int for sid in source_ids]):
+        atm_map[atm.id] = atm
+
+    for inc in incidents:
+        atm = atm_map.get(inc['sourceId'].int) if inc.get('sourceId') else None
+        inc['atmName'] = atm.name if atm else None
+        inc['atmLocation'] = atm.location if atm else None
+        inc['atmHealthScore'] = atm.healthScore if atm else None
+
+    return Response(incidents)
 
 
 @api_view(['GET', 'PATCH'])
@@ -752,9 +1082,12 @@ def incident_detail(request, id):
     except Incident.DoesNotExist:
         return Response({'error': 'Not found'}, status=404)
     if request.method == 'PATCH':
-        for field in ['status', 'severity', 'assignedTo']:
+        for field in ['status', 'severity', 'assignedTo', 'escalationReason', 'notes']:
             if field in request.data:
                 setattr(incident, field, request.data[field])
+        # Set acknowledgedAt on first status change away from OPEN
+        if 'status' in request.data and request.data['status'] != 'OPEN' and not incident.acknowledgedAt:
+            incident.acknowledgedAt = timezone.now()
         incident.save()
     return Response(list(Incident.objects.filter(id=id).values())[0])
 
@@ -766,6 +1099,8 @@ def assign_incident(request, id):
         engineer = request.data.get('username') or request.data.get('userId')
         incident.assignedTo = engineer
         incident.status = 'INVESTIGATING'
+        if not incident.acknowledgedAt:
+            incident.acknowledgedAt = timezone.now()
         incident.save()
 
         # Propagate to customer-facing FailedTransactions —
@@ -1165,6 +1500,65 @@ def notification_list(request):
     return Response(list(CustomerNotification.objects.all().order_by('-createdAt').values()))
 
 
+@api_view(['GET'])
+def language_routing(request):
+    """
+    Feature 11 — Multilingual Auto-Routing audit endpoint.
+
+    Returns the language each ATM's customer alerts will be routed to,
+    plus a fleet-wide distribution summary. Powers the Language Routing
+    card on the Communications page.
+    """
+    from .language_router import detect_language_from_text, LANGUAGE_META, SUPPORTED_LANGUAGES
+
+    atms = list(
+        ATM.objects.all().order_by('region', 'location').values(
+            'id', 'name', 'location', 'region', 'status',
+        )
+    )
+
+    # Per-ATM routing
+    routed = []
+    distribution = {lang: 0 for lang in SUPPORTED_LANGUAGES}
+    for a in atms:
+        lang = detect_language_from_text(a.get('region') or '', a.get('location') or '')
+        meta = LANGUAGE_META.get(lang, {'name': lang, 'native': lang, 'flag': 'IN'})
+        routed.append({
+            'id':         a['id'],
+            'name':       a['name'],
+            'location':   a['location'],
+            'region':     a['region'],
+            'status':     a['status'],
+            'language':   lang,
+            'languageName':   meta['name'],
+            'languageNative': meta['native'],
+        })
+        distribution[lang] = distribution.get(lang, 0) + 1
+
+    # Build distribution list sorted by count desc (for UI table)
+    total = len(routed)
+    distribution_list = [
+        {
+            'code':    code,
+            'name':    LANGUAGE_META[code]['name'],
+            'native':  LANGUAGE_META[code]['native'],
+            'count':   count,
+            'percent': round((count / total) * 100, 1) if total else 0.0,
+        }
+        for code, count in distribution.items()
+    ]
+    distribution_list.sort(key=lambda d: d['count'], reverse=True)
+
+    return Response({
+        'total':         total,
+        'distribution':  distribution_list,
+        'atms':          routed,
+        'supportedLanguages': [
+            {'code': c, **LANGUAGE_META[c]} for c in SUPPORTED_LANGUAGES
+        ],
+    })
+
+
 @api_view(['POST'])
 def send_notification(request):
     """
@@ -1340,7 +1734,7 @@ def transaction_list(request):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([AllowAny])  # TODO: restrict to IsAuthenticated in production
 def transaction_ingest(request):
     """
     Ingest a single transaction and run fraud detection asynchronously.

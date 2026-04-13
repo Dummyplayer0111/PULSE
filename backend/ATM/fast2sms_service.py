@@ -22,49 +22,12 @@ DEMO_PHONE       = os.environ.get('DEMO_CUSTOMER_PHONE', '').strip()
 
 FAST2SMS_URL = 'https://www.fast2sms.com/dev/bulkV2'
 
-# ── Region → language detection ───────────────────────────────────────────────
-_LANG_MAP = [
-    (['TAMIL NADU', 'CHENNAI', 'COIMBATORE', 'MADURAI', 'TRICHY',
-      'TIRUCHIRAPPALLI', 'SALEM', 'TIRUNELVELI', 'PONDICHERRY', 'PUDUCHERRY'], 'ta'),
-
-    (['MAHARASHTRA', 'MUMBAI', 'PUNE', 'NASHIK', 'NAGPUR',
-      'AURANGABAD', 'THANE', 'NAVI MUMBAI'],                                   'mr'),
-
-    # Karnataka BEFORE West Bengal — 'BENGALURU' contains 'BENGAL', must match 'kn' first
-    (['KARNATAKA', 'BANGALORE', 'BENGALURU', 'MYSORE', 'MYSURU',
-      'HUBLI', 'DHARWAD', 'MANGALORE', 'MANGALURU', 'BELGAUM'],               'kn'),
-
-    # Use 'WEST BENGAL' / 'KOLKATA' — never bare 'BENGAL' to avoid Bengaluru collision
-    (['WEST BENGAL', 'KOLKATA', 'CALCUTTA', 'HOWRAH', 'SILIGURI'],            'bn'),
-
-    (['ANDHRA PRADESH', 'TELANGANA', 'HYDERABAD', 'SECUNDERABAD',
-      'VIJAYAWADA', 'VISAKHAPATNAM', 'VIZAG', 'WARANGAL', 'GUNTUR'],          'te'),
-
-    (['GUJARAT', 'AHMEDABAD', 'SURAT', 'BARODA', 'VADODARA',
-      'RAJKOT', 'GANDHINAGAR', 'BHAVNAGAR'],                                   'gu'),
-
-    (['DELHI', 'NEW DELHI', 'RAJASTHAN', 'JAIPUR', 'JODHPUR',
-      'UTTAR PRADESH', 'LUCKNOW', 'KANPUR', 'AGRA', 'VARANASI',
-      'BIHAR', 'PATNA', 'MADHYA PRADESH', 'BHOPAL', 'INDORE',
-      'HARYANA', 'GURGAON', 'FARIDABAD', 'CHANDIGARH',
-      'PUNJAB', 'AMRITSAR', 'LUDHIANA', 'UTTARAKHAND', 'DEHRADUN'], 'hi'),
-]
-
-
-def detect_language(atm) -> str:
-    """
-    Return the best-fit language code (ta/mr/bn/kn/te/gu/hi/en)
-    by scanning ATM.region and ATM.location.
-    Falls back to 'en' when no region matches.
-    """
-    region   = getattr(atm, 'region',   '') or ''
-    location = getattr(atm, 'location', '') or ''
-    text = f"{region} {location}".upper()
-
-    for keywords, lang in _LANG_MAP:
-        if any(kw in text for kw in keywords):
-            return lang
-    return 'en'
+# ── Region → language detection (Feature 11) ──────────────────────────────────
+# Region mapping lives in language_router.py — single source of truth shared
+# with the audit endpoint and the management command. Re-exported here so that
+# existing imports (`from .fast2sms_service import detect_language`) keep
+# working.
+from .language_router import detect_language, REGION_LANGUAGE_RULES as _LANG_MAP  # noqa: F401
 
 
 def is_configured() -> bool:

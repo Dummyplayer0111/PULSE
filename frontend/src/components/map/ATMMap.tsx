@@ -1,11 +1,13 @@
 import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet.heat';
 
 interface ATMMapProps {
   atms: any[];
   selectedId: string | number | null;
   onATMClick: (atm: any) => void;
+  heatmapMode?: boolean;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -75,7 +77,42 @@ function FitBounds({ atms }: { atms: any[] }) {
   return null;
 }
 
-export default function ATMMap({ atms, selectedId, onATMClick }: ATMMapProps) {
+/** Heatmap layer using leaflet.heat */
+function HeatmapLayer({ atms }: { atms: any[] }) {
+  const map = useMap();
+  const layerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (layerRef.current) {
+      map.removeLayer(layerRef.current);
+    }
+    const points = atms
+      .filter(a => a.latitude && a.longitude)
+      .map(a => {
+        // Invert health: low health = high heat intensity
+        const intensity = Math.max(0.1, (100 - (a.healthScore ?? 100)) / 100);
+        return [a.latitude, a.longitude, intensity] as [number, number, number];
+      });
+    if (points.length > 0) {
+      layerRef.current = (L as any).heatLayer(points, {
+        radius: 35,
+        blur: 25,
+        maxZoom: 12,
+        max: 1.0,
+        gradient: { 0.2: '#22c55e', 0.4: '#eab308', 0.6: '#f97316', 0.8: '#ef4444', 1.0: '#dc2626' },
+      }).addTo(map);
+    }
+    return () => {
+      if (layerRef.current) {
+        map.removeLayer(layerRef.current);
+      }
+    };
+  }, [atms, map]);
+
+  return null;
+}
+
+export default function ATMMap({ atms, selectedId, onATMClick, heatmapMode = false }: ATMMapProps) {
   const validATMs = useMemo(() => atms.filter(a => a.latitude && a.longitude), [atms]);
 
   const [isDark, setIsDark] = useState(
@@ -111,7 +148,9 @@ export default function ATMMap({ atms, selectedId, onATMClick }: ATMMapProps) {
 
       <FitBounds atms={validATMs} />
 
-      {validATMs.map(atm => (
+      {heatmapMode && <HeatmapLayer atms={validATMs} />}
+
+      {!heatmapMode && validATMs.map(atm => (
         <Marker
           key={atm.id}
           position={[atm.latitude, atm.longitude]}

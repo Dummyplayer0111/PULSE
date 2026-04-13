@@ -26,12 +26,15 @@ load_dotenv(BASE_DIR.parent / '.env', override=False)  # project root fallback
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-r2bkjy2krxh_l455$kn3lnmj&-rs6^6+hvmz^2ch26g_k6jf9!'
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-r2bkjy2krxh_l455$kn3lnmj&-rs6^6+hvmz^2ch26g_k6jf9!',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -52,6 +55,8 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    # NOTE: Enable IsAuthenticated default for production deployments
+    # 'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
 }
 ASGI_APPLICATION = 'PULSE.asgi.application'
 MIDDLEWARE = [
@@ -150,5 +155,10 @@ else:
         },
     }
 
-# CORS — allow all origins in development
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS — allow all in demo; set CORS_ALLOWED_ORIGINS for production
+CORS_ALLOW_ALL_ORIGINS = DEBUG
+if not CORS_ALLOW_ALL_ORIGINS:
+    CORS_ALLOWED_ORIGINS = os.environ.get(
+        'CORS_ALLOWED_ORIGINS',
+        'http://localhost:3000,http://127.0.0.1:3000',
+    ).split(',')

@@ -135,7 +135,8 @@ def request_otp(request):
     )
 
     # Mock SMS — log to console (structured for real Twilio/MSG91 swap)
-    logger.info(f"[SMS → ***{phone[-4:]}] PayGuard OTP: {otp_code}. Valid {OTP_EXPIRY_MINUTES} min.")
+    # NOTE: OTP intentionally excluded from logger — never log secrets in production
+    logger.info(f"[SMS → ***{phone[-4:]}] PayGuard OTP sent. Valid {OTP_EXPIRY_MINUTES} min.")
     print(f"\n{'='*70}")
     print(f"  \U0001f4f1 SMS \u2192 +91 ***{phone[-4:]}")
     print(f"  Your PayGuard verification code is: {otp_code}")

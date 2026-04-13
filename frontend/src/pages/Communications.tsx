@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Send, Plus, MessageSquare, AlertCircle } from 'lucide-react';
+import { Send, Plus, MessageSquare, AlertCircle, Languages } from 'lucide-react';
 import {
   useGetNotificationsQuery,
   useSendNotificationMutation,
   useGetTemplatesQuery,
   useCreateTemplateMutation,
+  useGetLanguageRoutingQuery,
 } from '../services/payguardApi';
 import Modal from '../components/common/Modal';
 import { formatDate } from '../utils';
@@ -13,13 +14,38 @@ const EMPTY_NOTIFY = { recipientId: '', channel: 'SMS', message: '' };
 const EMPTY_TMPL   = { name: '', language: 'en', body: '' };
 
 const CHANNELS   = ['SMS', 'EMAIL', 'PUSH', 'WHATSAPP'];
-const LANGUAGES  = [
-  { code: 'en', label: 'English' },
-  { code: 'hi', label: 'Hindi'   },
-  { code: 'ta', label: 'Tamil'   },
-  { code: 'te', label: 'Telugu'  },
-  { code: 'bn', label: 'Bengali' },
+
+// Feature 11 — all 8 supported languages (en + 7 Indian regional)
+const LANGUAGES = [
+  { code: 'en', label: 'English',  native: 'English'    },
+  { code: 'hi', label: 'Hindi',    native: 'हिन्दी'      },
+  { code: 'ta', label: 'Tamil',    native: 'தமிழ்'      },
+  { code: 'te', label: 'Telugu',   native: 'తెలుగు'     },
+  { code: 'kn', label: 'Kannada',  native: 'ಕನ್ನಡ'      },
+  { code: 'mr', label: 'Marathi',  native: 'मराठी'      },
+  { code: 'bn', label: 'Bengali',  native: 'বাংলা'       },
+  { code: 'gu', label: 'Gujarati', native: 'ગુજરાતી'     },
 ];
+
+// Distinct color per language — used for the routing badge
+const LANG_COLORS: Record<string, { color: string; bg: string; border: string }> = {
+  en: { color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.25)' },
+  hi: { color: '#fb923c', bg: 'rgba(251,146,60,0.12)',  border: 'rgba(251,146,60,0.25)'  },
+  ta: { color: '#f472b6', bg: 'rgba(244,114,182,0.12)', border: 'rgba(244,114,182,0.25)' },
+  te: { color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.25)' },
+  kn: { color: '#facc15', bg: 'rgba(250,204,21,0.12)',  border: 'rgba(250,204,21,0.25)'  },
+  mr: { color: '#fb7185', bg: 'rgba(251,113,133,0.12)', border: 'rgba(251,113,133,0.25)' },
+  bn: { color: '#34d399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.25)'  },
+  gu: { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  border: 'rgba(96,165,250,0.25)'  },
+};
+
+function langStyle(code: string) {
+  return LANG_COLORS[code] ?? LANG_COLORS.en;
+}
+
+function langLabel(code: string) {
+  return LANGUAGES.find(l => l.code === code)?.label ?? code.toUpperCase();
+}
 
 function staStyle(s: string) {
   const m: any = {
@@ -58,6 +84,7 @@ export default function Communications() {
   const [tab, setTab] = useState<'notifications' | 'templates'>('notifications');
 
   const { data: notifications = [], isLoading: notifLoading, isError: notifError } = useGetNotificationsQuery();
+  const { data: routing } = useGetLanguageRoutingQuery();
   const [sendNotification, { isLoading: sending }] = useSendNotificationMutation();
   const [notifForm, setNotifForm] = useState(EMPTY_NOTIFY);
   const [notifLang, setNotifLang] = useState('en');
@@ -110,6 +137,60 @@ export default function Communications() {
       {/* Notifications tab */}
       {tab === 'notifications' && (
         <div className="space-y-6">
+
+          {/* Feature 11 — Language Routing summary */}
+          {routing && (routing as any).total > 0 && (
+            <div
+              className="rounded-2xl p-6"
+              style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <Languages size={16} style={{ color: '#a78bfa' }} />
+                <h3 className="text-sm font-semibold text-white">Multilingual Auto-Routing</h3>
+                <span
+                  className="text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider"
+                  style={{ color: '#a78bfa', background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.25)' }}
+                >
+                  Feature 11
+                </span>
+                <span className="ml-auto text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  {(routing as any).total} ATMs · auto-detected from region
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                {((routing as any).distribution || []).map((d: any) => {
+                  const st = langStyle(d.code);
+                  return (
+                    <div
+                      key={d.code}
+                      className="rounded-xl px-3 py-2.5 flex flex-col"
+                      style={{ background: st.bg, border: `1px solid ${st.border}` }}
+                      title={`${d.count} ATMs (${d.percent}%)`}
+                    >
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: st.color }}>
+                          {d.code}
+                        </span>
+                        <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                          {d.percent}%
+                        </span>
+                      </div>
+                      <div className="text-[13px] font-semibold mt-0.5" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                        {d.count}
+                      </div>
+                      <div className="text-[10px] truncate" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                        {d.name}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] mt-3" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                Customer SMS alerts are automatically sent in the regional language of the
+                affected ATM — no manual routing required.
+              </p>
+            </div>
+          )}
 
           {/* Send form */}
           <div
@@ -223,7 +304,7 @@ export default function Communications() {
               <table className="w-full">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--p-card-border)' }}>
-                    {['Recipient', 'Channel', 'Message', 'Status', 'Sent'].map(h => (
+                    {['Recipient', 'Channel', 'Language', 'Message', 'Status', 'Sent'].map(h => (
                       <th key={h} className="px-5 py-3.5 text-left text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.28)' }}>{h}</th>
                     ))}
                   </tr>
@@ -231,6 +312,8 @@ export default function Communications() {
                 <tbody>
                   {(notifications as any[]).map((n: any) => {
                     const st = staStyle(n.status || 'SENT');
+                    const lang = (n.language || 'en').toLowerCase();
+                    const ls = langStyle(lang);
                     return (
                       <tr key={n.id} className="transition-colors" style={{ borderBottom: '1px solid var(--p-card-border)' }}
                         onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--p-card-hover)'}
@@ -240,6 +323,16 @@ export default function Communications() {
                           {n.recipientId || n.recipient || '—'}
                         </td>
                         <td className="px-5 py-3.5 text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>{n.channel || '—'}</td>
+                        <td className="px-5 py-3.5">
+                          <span
+                            className="text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider inline-flex items-center gap-1"
+                            style={{ color: ls.color, background: ls.bg, border: `1px solid ${ls.border}` }}
+                            title={langLabel(lang)}
+                          >
+                            {lang}
+                            <span className="opacity-70 normal-case tracking-normal">{langLabel(lang)}</span>
+                          </span>
+                        </td>
                         <td className="px-5 py-3.5 text-sm text-white max-w-xs truncate">{n.message || '—'}</td>
                         <td className="px-5 py-3.5">
                           <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold" style={{ color: st.color, background: st.bg }}>

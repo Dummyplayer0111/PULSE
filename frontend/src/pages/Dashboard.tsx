@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { AlertTriangle, Brain, ShieldAlert, CheckCircle2, AlertCircle, TrendingUp, Activity, Zap, Shield } from 'lucide-react';
+import { AlertTriangle, Brain, ShieldAlert, CheckCircle2, AlertCircle, TrendingUp, Activity, Zap, Shield, Clock, ArrowUp, ArrowDown, Minus, Bot } from 'lucide-react';
 import {
   useGetDashboardSummaryQuery,
   useGetIncidentsQuery,
@@ -8,11 +8,14 @@ import {
   useGetAIPredictionsQuery,
   useGetRootCauseStatsQuery,
   useGetChannelsQuery,
+  useGetSLAMetricsQuery,
+  useGetDashboardTrendsQuery,
 } from '../services/payguardApi';
 import { formatDate, formatConfidence } from '../utils';
 import { usePipelineSocket } from '../hooks/usePipelineSocket';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
+import { useToast } from '../components/notifications/ToastProvider';
 import { useCountUp, useCountUpFloat } from '../hooks/useCountUp';
 import { BentoCard } from '../components/BentoCard';
 import DonutChart from '../components/charts/DonutChart';
@@ -44,13 +47,54 @@ function Skel({ h = 'h-4' }: { h?: string }) {
   return <div className={`${h} rounded animate-pulse`} style={{ background: 'var(--p-card-strong)' }} />;
 }
 
+/* ── Mini SVG sparkline ─────────────────────────────────────────────────── */
+function MiniSparkline({ data, color = '#e8af48', width = 80, height = 20 }: { data: (number | null)[]; color?: string; width?: number; height?: number }) {
+  const valid = data.filter((v): v is number => v != null);
+  if (valid.length < 2) return null;
+  const min = Math.min(...valid);
+  const max = Math.max(...valid);
+  const range = max - min || 1;
+  const points = valid.map((v, i) => {
+    const x = (i / (valid.length - 1)) * width;
+    const y = height - ((v - min) / range) * (height - 2) - 1;
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <svg width={width} height={height} style={{ display: 'block', overflow: 'visible' }}>
+      <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />
+      <circle cx={parseFloat(points.split(' ').pop()!.split(',')[0])} cy={parseFloat(points.split(' ').pop()!.split(',')[1])} r={2} fill={color} />
+    </svg>
+  );
+}
+
+/* ── Delta arrow badge ─────────────────────────────────────────────────── */
+function DeltaBadge({ current, previous, invert = false }: { current: number; previous: number; invert?: boolean }) {
+  if (previous === 0 && current === 0) return null;
+  const diff = current - previous;
+  if (diff === 0) return <Minus size={9} style={{ color: 'var(--p-text-dim)', opacity: 0.5 }} />;
+  const isUp = diff > 0;
+  const isGood = invert ? !isUp : isUp;
+  const color = isGood ? '#22c55e' : '#ef4444';
+  const Icon = isUp ? ArrowUp : ArrowDown;
+  const pct = previous > 0 ? Math.round(Math.abs(diff / previous) * 100) : 0;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Icon size={9} style={{ color }} />
+      {pct > 0 && <span style={{ fontSize: 8.5, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>}
+    </div>
+  );
+}
+
 /* ── Animated metric KPI card ───────────────────────────────────────────── */
 function MetricCard({
   label, rawValue, suffix = '', prefix = '', color = '#e8af48',
   note, icon: Icon, delay = 0, isFloat = false,
+  delta, sparkline,
 }: {
   label: string; rawValue: number; suffix?: string; prefix?: string;
   color?: string; note?: string; icon?: any; delay?: number; isFloat?: boolean;
+  delta?: { current: number; previous: number; invert?: boolean };
+  sparkline?: (number | null)[];
 }) {
   const intVal   = useCountUp(isFloat ? 0 : rawValue, 1600);
   const floatVal = useCountUpFloat(isFloat ? rawValue : 0, 1, 1600);
@@ -70,10 +114,16 @@ function MetricCard({
             </div>
           )}
         </div>
-        <p style={{ fontSize: 28, fontWeight: 800, lineHeight: 1, color, margin: 0, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
-          {prefix}{displayVal}{suffix}
-        </p>
-        {note && <p style={{ fontSize: 9.5, marginTop: 6, color: 'var(--p-text-dim)', margin: '6px 0 0' }}>{note}</p>}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+          <p style={{ fontSize: 28, fontWeight: 800, lineHeight: 1, color, margin: 0, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
+            {prefix}{displayVal}{suffix}
+          </p>
+          {delta && <DeltaBadge current={delta.current} previous={delta.previous} invert={delta.invert} />}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+          {note && <p style={{ fontSize: 9.5, color: 'var(--p-text-dim)', margin: 0 }}>{note}</p>}
+          {sparkline && <MiniSparkline data={sparkline} color={color} />}
+        </div>
       </div>
       {/* Micro spark line at bottom */}
       <div style={{ height: 2, background: `linear-gradient(90deg, ${color}00, ${color}40, ${color}00)`, marginTop: 4 }} />
@@ -208,9 +258,35 @@ export default function Dashboard() {
   const { data: preds }                                 = useGetAIPredictionsQuery();
   const { data: rcStats }                               = useGetRootCauseStatsQuery();
   const { data: channels = [] }                         = useGetChannelsQuery();
+  const { data: slaData }                               = useGetSLAMetricsQuery(undefined, { pollingInterval: 15000 });
+  const { data: trends }                                = useGetDashboardTrendsQuery(undefined, { pollingInterval: 15000 });
 
   const { status: wsStatus } = usePipelineSocket();
   const pipelineEvents = useSelector((s: RootState) => s.pipeline.events);
+  const { push: pushToast } = useToast();
+
+  // Fire toast for new incidents detected via REST polling (fallback for InMemoryChannelLayer)
+  const seenIdsRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    if (incLoading || incidents.length === 0) return;
+    const all = incidents as any[];
+    // On first load, seed the set without firing toasts
+    if (seenIdsRef.current.size === 0) {
+      all.forEach((i: any) => seenIdsRef.current.add(i.id));
+      return;
+    }
+    for (const inc of all) {
+      if (!seenIdsRef.current.has(inc.id)) {
+        seenIdsRef.current.add(inc.id);
+        // Only toast for HIGH/CRITICAL — skip low-severity noise
+        if (inc.severity === 'CRITICAL') {
+          pushToast('critical', `CRITICAL: ${inc.title}`, `Incident ${inc.incidentId} — ${inc.rootCauseCategory} detected`);
+        } else if (inc.severity === 'HIGH') {
+          pushToast('high', inc.title, `${inc.rootCauseCategory} failure — ${inc.incidentId}`);
+        }
+      }
+    }
+  }, [incidents, incLoading]);
 
   const openInc        = summary?.activeIncidents ?? incidents.filter((i: any) => i.status !== 'RESOLVED' && i.status !== 'AUTO_RESOLVED').length;
   const critical       = incidents.filter((i: any) => i.severity === 'CRITICAL').length;
@@ -265,13 +341,23 @@ export default function Dashboard() {
       </div>
 
       {/* ── Metric strip — individual bento cards ──────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
-        <MetricCard label="Open Incidents"   rawValue={incLoading ? 0 : openInc}       color={openInc > 0 ? '#ef4444' : '#22c55e'}   note="requires attention"  icon={AlertTriangle} delay={0}   />
-        <MetricCard label="Critical Alerts"  rawValue={incLoading ? 0 : critical}       color={critical > 0 ? '#f97316' : '#6b7280'}  note="severity: critical"  icon={AlertCircle}   delay={60}  />
-        <MetricCard label="Active Anomalies" rawValue={activeAno}                        color={activeAno > 0 ? '#eab308' : '#6b7280'} note="flagged by Z-score"  icon={ShieldAlert}   delay={120} />
-        <MetricCard label="AI Predictions"   rawValue={predList.length}                  color={predList.length > 0 ? '#a78bfa' : '#6b7280'} note="at-risk ATMs" icon={Brain}         delay={180} />
-        <MetricCard label="Platform Health"  rawValue={platformHealth}       suffix="%"  color={platformHealth >= 80 ? '#22c55e' : platformHealth >= 60 ? '#eab308' : '#ef4444'} note="avg. ATM score" icon={Activity} delay={240} isFloat />
-        <MetricCard label="UPI Success Rate" rawValue={upiRate}              suffix="%"  color={upiRate >= 95 ? '#22c55e' : '#eab308'} note="payment channels" icon={TrendingUp}     delay={300} isFloat />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+        <MetricCard label="Open Incidents"   rawValue={incLoading ? 0 : openInc}       color={openInc > 0 ? '#ef4444' : '#22c55e'}   note="requires attention"  icon={AlertTriangle} delay={0}
+          delta={trends ? { current: trends.openIncidents.current, previous: trends.openIncidents.previous, invert: true } : undefined}
+          sparkline={trends?.incidentSparkline} />
+        <MetricCard label="Critical Alerts"  rawValue={incLoading ? 0 : critical}       color={critical > 0 ? '#f97316' : '#6b7280'}  note="severity: critical"  icon={AlertCircle}   delay={60}
+          delta={trends ? { current: trends.criticalAlerts.current, previous: trends.criticalAlerts.previous, invert: true } : undefined} />
+        <MetricCard label="Active Anomalies" rawValue={activeAno}                        color={activeAno > 0 ? '#eab308' : '#6b7280'} note="flagged by Z-score"  icon={ShieldAlert}   delay={120}
+          delta={trends ? { current: trends.activeAnomalies.current, previous: trends.activeAnomalies.previous, invert: true } : undefined} />
+        <MetricCard label="Platform Health"  rawValue={platformHealth}       suffix="%"  color={platformHealth >= 80 ? '#22c55e' : platformHealth >= 60 ? '#eab308' : '#ef4444'} note="avg. ATM score" icon={Activity} delay={180} isFloat
+          sparkline={trends?.healthSparkline} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+        <MetricCard label="AI Predictions"   rawValue={predList.length}                  color={predList.length > 0 ? '#a78bfa' : '#6b7280'} note="at-risk ATMs" icon={Brain}         delay={200} />
+        <MetricCard label="UPI Success Rate" rawValue={upiRate}              suffix="%"  color={upiRate >= 95 ? '#22c55e' : '#eab308'} note="payment channels" icon={TrendingUp}     delay={240} isFloat />
+        <MetricCard label="Zero-Touch Rate"  rawValue={slaData?.zeroTouchRate ?? 0}  suffix="%" color={slaData?.zeroTouchRate >= 50 ? '#22c55e' : '#eab308'} note="auto-resolved" icon={Bot} delay={280} isFloat
+          delta={slaData ? { current: slaData.zeroTouchRate, previous: slaData.prevWeekZeroTouchRate } : undefined} />
+        <MetricCard label="MTTR" rawValue={Math.round((slaData?.mttrSeconds ?? 0) / 60)} suffix="m" color={(slaData?.mttrSeconds ?? 0) / 60 <= 30 ? '#22c55e' : '#f97316'} note="mean time to resolve" icon={Clock} delay={320} />
       </div>
 
       {/* ── Payment channels ──────────────────────────────────────────── */}
@@ -291,6 +377,28 @@ export default function Dashboard() {
                 </div>
               );
             })}
+          </div>
+        </BentoCard>
+      )}
+
+      {/* ── SLA Metrics strip ──────────────────────────────────────────── */}
+      {slaData && (
+        <BentoCard delay={340} noPad>
+          <SH title="SLA Performance" right={<span style={{ fontVariantNumeric: 'tabular-nums' }}>{slaData.totalIncidents30d} incidents · 30d</span>} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0 }}>
+            {[
+              { label: 'MTTA', value: `${Math.round(slaData.mttaSeconds / 60)}m`, sub: 'avg acknowledge', color: slaData.mttaSeconds / 60 <= 15 ? '#22c55e' : '#f97316' },
+              { label: 'MTTR', value: `${Math.round(slaData.mttrSeconds / 60)}m`, sub: 'avg resolve', color: slaData.mttrSeconds / 3600 <= 4 ? '#22c55e' : '#f97316' },
+              { label: 'MTTA Breaches', value: String(slaData.mttaBreaches), sub: '> 15 min SLA', color: slaData.mttaBreaches === 0 ? '#22c55e' : '#ef4444' },
+              { label: 'MTTR Breaches', value: String(slaData.mttrBreaches), sub: '> 4 hr SLA', color: slaData.mttrBreaches === 0 ? '#22c55e' : '#ef4444' },
+              { label: 'Zero-Touch', value: `${slaData.zeroTouchRate}%`, sub: 'auto-resolved', color: slaData.zeroTouchRate >= 50 ? '#22c55e' : '#eab308' },
+            ].map((m, i) => (
+              <div key={m.label} style={{ padding: '16px 20px', textAlign: 'center', borderLeft: i > 0 ? '1px solid var(--p-card-border)' : 'none' }}>
+                <p style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--p-text-dim)', margin: '0 0 8px' }}>{m.label}</p>
+                <p style={{ fontSize: 24, fontWeight: 800, color: m.color, margin: 0, fontVariantNumeric: 'tabular-nums' }}>{m.value}</p>
+                <p style={{ fontSize: 9, color: 'var(--p-text-dim)', margin: '4px 0 0' }}>{m.sub}</p>
+              </div>
+            ))}
           </div>
         </BentoCard>
       )}

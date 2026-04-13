@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { motion, AnimatePresence } from 'motion/react';
-import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { Provider, useDispatch } from 'react-redux';
+import { BrowserRouter, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
+import { Provider, useDispatch, useSelector } from 'react-redux';
 import { store } from './src/store';
 import { setAuth } from './src/store/authSlice';
 import Layout              from './src/components/Layout';
+import { ToastProvider }   from './src/components/notifications/ToastProvider';
 import Dashboard           from './src/pages/Dashboard';
 import ATMMapPage          from './src/pages/ATMMap';
 import ATMDetail           from './src/pages/ATMDetail';
@@ -16,6 +17,7 @@ import Communications      from './src/pages/Communications';
 import Settings            from './src/pages/Settings';
 import Logs                from './src/pages/Logs';
 import EngineerDashboard   from './src/pages/EngineerDashboard';
+import ViewerDashboard     from './src/pages/ViewerDashboard';
 import CustomerPortal      from './src/pages/CustomerPortal';
 import { Brain, Zap, ShieldAlert, Globe, Activity, TrendingUp, ArrowRight, ChevronRight, Home, LogIn } from 'lucide-react';
 
@@ -948,12 +950,12 @@ function LandingPage() {
   );
 }
 
+
 // ─── CARD SWIPE ANIMATION ─────────────────────────────────────────────────────
 function CardSwipeAnimation() {
   return (
     <div style={{ width: '100%', maxWidth: 420, margin: '0 auto', position: 'relative' }}>
       <style>{`
-        /* ── Card Swipe Keyframes ── */
         @keyframes cs-card-enter {
           0%   { transform: translate(86px, -60px) rotate(-8deg); opacity: 0; }
           15%  { opacity: 1; }
@@ -1046,101 +1048,68 @@ function CardSwipeAnimation() {
         </defs>
 
         <g className="cs-anim">
-          {/* ── Ground shadow ── */}
           <ellipse cx="160" cy="295" rx="48" ry="8" fill="rgba(196,151,70,0.12)" style={{ animation: 'cs-shadow-pulse 5s ease-in-out infinite' }} />
-
-          {/* ── Machine body ── */}
           <rect x="96" y="80" width="128" height="200" rx="16" fill="url(#cs-body)" stroke="url(#cs-body-edge)" strokeWidth="1" />
-          {/* Top specular edge */}
           <line x1="108" y1="80.5" x2="212" y2="80.5" stroke="rgba(196,151,70,0.3)" strokeWidth="0.5" />
-          {/* Inner bevel */}
           <rect x="100" y="84" width="120" height="192" rx="13" fill="none" stroke="rgba(196,151,70,0.06)" strokeWidth="0.5" />
-
-          {/* ── Receipt printer slot (top) ── */}
           <rect x="124" y="78" width="72" height="6" rx="3" fill="rgba(0,0,0,0.5)" stroke="rgba(196,151,70,0.15)" strokeWidth="0.5" />
-
-          {/* ── Screen ── */}
           <rect x="114" y="100" width="92" height="56" rx="6" fill="rgba(196,151,70,0.06)" stroke="rgba(196,151,70,0.15)" strokeWidth="0.5" style={{ animation: 'cs-screen-pulse 5s ease-in-out infinite' }} />
-          {/* Screen content lines (idle) */}
           <rect x="124" y="112" width="42" height="3" rx="1.5" fill="rgba(196,151,70,0.15)" />
           <rect x="124" y="120" width="62" height="2" rx="1" fill="rgba(196,151,70,0.08)" />
           <rect x="124" y="127" width="52" height="2" rx="1" fill="rgba(196,151,70,0.08)" />
           <rect x="124" y="134" width="30" height="2" rx="1" fill="rgba(196,151,70,0.06)" />
-          {/* Screen success text */}
           <g style={{ animation: 'cs-screen-text 5s ease-in-out infinite' }}>
             <text x="160" y="123" textAnchor="middle" fill="rgba(74,222,128,0.8)" fontSize="9" fontWeight="700" fontFamily="monospace">APPROVED</text>
             <text x="160" y="137" textAnchor="middle" fill="rgba(196,151,70,0.45)" fontSize="6.5" fontFamily="monospace">Transaction OK</text>
             <rect x="143" y="143" width="34" height="5" rx="2.5" fill="rgba(74,222,128,0.15)" stroke="rgba(74,222,128,0.3)" strokeWidth="0.5" />
             <text x="160" y="147.2" textAnchor="middle" fill="rgba(74,222,128,0.7)" fontSize="4" fontWeight="600" fontFamily="monospace">SUCCESS</text>
           </g>
-
-          {/* ── Keypad ── */}
           {[0,1,2].map(row => [0,1,2].map(col => (
             <rect key={`k${row}${col}`} x={124 + col * 24} y={170 + row * 20} width={18} height={14} rx={4}
               fill="rgba(196,151,70,0.04)" stroke="rgba(196,151,70,0.12)" strokeWidth="0.5" />
           )))}
-          {/* Key labels */}
           {['1','2','3','4','5','6','7','8','9'].map((n, i) => (
             <text key={`kl${i}`} x={133 + (i % 3) * 24} y={181 + Math.floor(i / 3) * 20} textAnchor="middle" fill="rgba(196,151,70,0.2)" fontSize="7" fontFamily="monospace">{n}</text>
           ))}
-          {/* Bottom row: *, 0, # */}
           <rect x="124" y="230" width="18" height="14" rx="4" fill="rgba(196,151,70,0.04)" stroke="rgba(196,151,70,0.12)" strokeWidth="0.5" />
           <rect x="148" y="230" width="18" height="14" rx="4" fill="rgba(196,151,70,0.04)" stroke="rgba(196,151,70,0.12)" strokeWidth="0.5" />
           <rect x="172" y="230" width="18" height="14" rx="4" fill="rgba(74,222,128,0.06)" stroke="rgba(74,222,128,0.2)" strokeWidth="0.5" />
           <text x="133" y="241" textAnchor="middle" fill="rgba(196,151,70,0.18)" fontSize="7" fontFamily="monospace">*</text>
           <text x="157" y="241" textAnchor="middle" fill="rgba(196,151,70,0.18)" fontSize="7" fontFamily="monospace">0</text>
           <text x="181" y="240.5" textAnchor="middle" fill="rgba(74,222,128,0.4)" fontSize="7" fontWeight="700" fontFamily="monospace">OK</text>
-
-          {/* ── Card slot (right side) ── */}
           <rect x="224" y="130" width="8" height="50" rx="4" fill="rgba(0,0,0,0.6)" stroke="rgba(196,151,70,0.12)" strokeWidth="0.5" />
-          {/* Slot inner glow on swipe */}
           <rect x="225" y="132" width="6" height="46" rx="3" fill="rgba(232,175,72,0.25)" style={{ animation: 'cs-slot-flash 5s ease-in-out infinite' }} />
-
-          {/* ── Card reader indicator LEDs ── */}
           <circle cx="228" cy="124" r="2" fill="rgba(196,151,70,0.15)" stroke="rgba(196,151,70,0.1)" strokeWidth="0.5" />
           <circle cx="228" cy="186" r="2" fill="rgba(196,151,70,0.15)" stroke="rgba(196,151,70,0.1)" strokeWidth="0.5" />
-
-          {/* ── Machine feet ── */}
           <rect x="106" y="276" width="16" height="5" rx="2.5" fill="rgba(196,151,70,0.1)" />
           <rect x="198" y="276" width="16" height="5" rx="2.5" fill="rgba(196,151,70,0.1)" />
 
-          {/* ── ANIMATED: Bank card ── */}
+          {/* Animated card */}
           <g style={{ animation: 'cs-card-enter 5s cubic-bezier(0.4,0,0.2,1) infinite' }}>
-            {/* Card body */}
             <rect x="0" y="0" width="108" height="68" rx="8" fill="url(#cs-card-grad)" stroke="rgba(232,175,72,0.35)" strokeWidth="0.8" />
-            {/* Card inner highlight */}
             <line x1="10" y1="0.4" x2="98" y2="0.4" stroke="rgba(254,234,165,0.2)" strokeWidth="0.4" />
-            {/* Smart chip */}
             <g style={{ animation: 'cs-chip-glow 5s ease-in-out infinite' }}>
               <rect x="16" y="18" width="22" height="16" rx="3" fill="rgba(232,175,72,0.25)" stroke="rgba(232,175,72,0.5)" strokeWidth="0.6" />
-              {/* Chip contacts */}
               <line x1="20" y1="23" x2="34" y2="23" stroke="rgba(232,175,72,0.35)" strokeWidth="0.4" />
               <line x1="20" y1="26" x2="34" y2="26" stroke="rgba(232,175,72,0.35)" strokeWidth="0.4" />
               <line x1="20" y1="29" x2="34" y2="29" stroke="rgba(232,175,72,0.35)" strokeWidth="0.4" />
               <line x1="27" y1="19" x2="27" y2="33" stroke="rgba(232,175,72,0.25)" strokeWidth="0.3" />
             </g>
-            {/* Card number dots */}
             {[0,1,2,3].map(g => [0,1,2,3].map(d => (
               <circle key={`d${g}${d}`} cx={18 + g * 22 + d * 4.5} cy={44} r={1.2} fill="rgba(254,234,165,0.18)" />
             )))}
-            {/* Card brand line */}
             <rect x="68" y="14" width="28" height="10" rx="3" fill="rgba(254,234,165,0.06)" stroke="rgba(254,234,165,0.12)" strokeWidth="0.3" />
             <text x="82" y="22" textAnchor="middle" fill="rgba(254,234,165,0.2)" fontSize="5" fontWeight="700" fontFamily="monospace">BANK</text>
-            {/* Cardholder name area */}
             <rect x="16" y="52" width="44" height="3" rx="1.5" fill="rgba(254,234,165,0.1)" />
             <rect x="16" y="58" width="28" height="2" rx="1" fill="rgba(254,234,165,0.06)" />
-            {/* Exp date */}
             <text x="82" y="56" textAnchor="middle" fill="rgba(254,234,165,0.12)" fontSize="4.5" fontFamily="monospace">VALID</text>
             <text x="82" y="62" textAnchor="middle" fill="rgba(254,234,165,0.2)" fontSize="5.5" fontFamily="monospace">12/28</text>
           </g>
 
-          {/* ── ANIMATED: Receipt ── */}
+          {/* Animated receipt */}
           <g style={{ transformOrigin: '160px 78px', animation: 'cs-receipt-unroll 5s ease-out infinite' }}>
-            {/* Receipt paper */}
             <rect x="130" y="24" width="60" height="56" rx="2" fill="url(#cs-receipt-grad)" stroke="rgba(254,234,165,0.15)" strokeWidth="0.5" />
-            {/* Dashed cut line at top */}
             <line x1="134" y1="28" x2="186" y2="28" stroke="rgba(196,151,70,0.2)" strokeWidth="0.4" strokeDasharray="3 2" />
-            {/* Receipt content */}
             <text x="160" y="37" textAnchor="middle" fill="rgba(254,234,165,0.5)" fontSize="5" fontWeight="700" fontFamily="monospace">PAYGUARD</text>
             <line x1="138" y1="40" x2="182" y2="40" stroke="rgba(196,151,70,0.1)" strokeWidth="0.3" />
             <rect x="138" y="44" width="32" height="2" rx="1" fill="rgba(254,234,165,0.1)" />
@@ -1148,15 +1117,13 @@ function CardSwipeAnimation() {
             <rect x="138" y="53" width="38" height="1.5" rx="0.75" fill="rgba(254,234,165,0.07)" />
             <rect x="138" y="57" width="24" height="1.5" rx="0.75" fill="rgba(254,234,165,0.05)" />
             <text x="160" y="66" textAnchor="middle" fill="rgba(74,222,128,0.45)" fontSize="4.5" fontWeight="600" fontFamily="monospace">APPROVED</text>
-            {/* Dashed cut line at bottom */}
             <line x1="134" y1="72" x2="186" y2="72" stroke="rgba(196,151,70,0.15)" strokeWidth="0.4" strokeDasharray="3 2" />
-            {/* Barcode */}
             {[0,1,2,3,4,5,6,7,8,9,10,11].map(i => (
               <rect key={`bc${i}`} x={141 + i * 3.2} y={74} width={i % 3 === 0 ? 2 : 1.2} height="4" rx="0.3" fill={`rgba(254,234,165,${i % 2 === 0 ? 0.12 : 0.06})`} />
             ))}
           </g>
 
-          {/* ── ANIMATED: Success checkmark ── */}
+          {/* Animated checkmark */}
           <g style={{ animation: 'cs-check-pop 5s cubic-bezier(0.34,1.56,0.64,1) infinite' }} filter="url(#cs-glow)">
             <circle cx="0" cy="0" r="14" fill="rgba(74,222,128,0.12)" stroke="rgba(74,222,128,0.6)" strokeWidth="1.5"
               strokeDasharray="88" style={{ animation: 'cs-check-ring 5s ease-out infinite' }} />
@@ -1247,7 +1214,7 @@ function LoginPage() {
           if (meRes.ok) {
             const me = await meRes.json();
             dispatch(setAuth({ username: me.username, role: me.role, email: me.email }));
-            navigate(me.role === 'ENGINEER' ? '/engineer' : '/dashboard');
+            navigate(me.role === 'ENGINEER' ? '/engineer' : me.role === 'VIEWER' ? '/viewer' : '/dashboard');
           } else {
             navigate('/dashboard');
           }
@@ -1495,7 +1462,6 @@ function LoginPage() {
 
             {/* RIGHT: Card Swipe Animation — hidden on small screens */}
             <div className="hidden lg:flex" style={{ flex:'0 0 340px', alignItems:'center', justifyContent:'center', borderLeft:'1px solid rgba(196,151,70,0.1)', background:'rgba(196,151,70,0.015)', position:'relative', overflow:'hidden' }}>
-              {/* Ambient glow behind animation */}
               <div className="absolute pointer-events-none" style={{ top:'15%', left:'10%', width:'80%', height:'70%', background:'radial-gradient(circle, rgba(196,151,70,0.06) 0%, transparent 70%)', filter:'blur(30px)' }} />
               <div style={{ position:'relative', zIndex:1, padding:'1.5rem 0.5rem' }}>
                 <CardSwipeAnimation />
@@ -1515,10 +1481,19 @@ function LoginPage() {
   );
 }
 
+// ─── ROLE GUARD ───────────────────────────────────────────────────────────────
+function AdminOnly({ children }: { children: React.ReactNode }) {
+  const role = useSelector((s: any) => s.auth.role);
+  if (role === 'VIEWER') return <Navigate to="/viewer" replace />;
+  if (role === 'ENGINEER') return <Navigate to="/engineer" replace />;
+  return <>{children}</>;
+}
+
 // ─── APP ──────────────────────────────────────────────────────────────────────
 function App() {
   return (
     <Provider store={store}>
+      <ToastProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/"      element={<LandingPage />} />
@@ -1526,19 +1501,21 @@ function App() {
           <Route path="/customer" element={<CustomerPortal />} />
           <Route path="/customer/status/:token" element={<CustomerPortal />} />
           <Route element={<Layout />}>
-            <Route path="/dashboard"      element={<Dashboard />} />
+            <Route path="/dashboard"      element={<AdminOnly><Dashboard /></AdminOnly>} />
             <Route path="/engineer"       element={<EngineerDashboard />} />
+            <Route path="/viewer"         element={<ViewerDashboard />} />
             <Route path="/atm-map"        element={<ATMMapPage />} />
-            <Route path="/atm-detail/:id" element={<ATMDetail />} />
-            <Route path="/logs"           element={<Logs />} />
-            <Route path="/incidents"      element={<Incidents />} />
-            <Route path="/ai-analysis"    element={<AIAnalysis />} />
-            <Route path="/anomaly"        element={<Anomaly />} />
-            <Route path="/communications" element={<Communications />} />
-            <Route path="/settings"       element={<Settings />} />
+            <Route path="/atm-detail/:id" element={<AdminOnly><ATMDetail /></AdminOnly>} />
+            <Route path="/logs"           element={<AdminOnly><Logs /></AdminOnly>} />
+            <Route path="/incidents"      element={<AdminOnly><Incidents /></AdminOnly>} />
+            <Route path="/ai-analysis"    element={<AdminOnly><AIAnalysis /></AdminOnly>} />
+            <Route path="/anomaly"        element={<AdminOnly><Anomaly /></AdminOnly>} />
+            <Route path="/communications" element={<AdminOnly><Communications /></AdminOnly>} />
+            <Route path="/settings"       element={<AdminOnly><Settings /></AdminOnly>} />
           </Route>
         </Routes>
       </BrowserRouter>
+      </ToastProvider>
     </Provider>
   );
 }

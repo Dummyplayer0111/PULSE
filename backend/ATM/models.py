@@ -89,16 +89,18 @@ class Incident(models.Model):
 
     severity = models.CharField(
         max_length=10,
-        choices=SEVERITY_CHOICES
+        choices=SEVERITY_CHOICES,
+        db_index=True,
     )
 
     status = models.CharField(
         max_length=20,
         choices=INCIDENT_STATUS_CHOICES,
-        default="OPEN"
+        default="OPEN",
+        db_index=True,
     )
 
-    sourceId = models.UUIDField()
+    sourceId = models.UUIDField(db_index=True)
     sourceType = models.CharField(
         max_length=20,
         choices=SOURCE_TYPE_CHOICES
@@ -112,14 +114,17 @@ class Incident(models.Model):
 
     aiConfidence = models.FloatField()
 
-    triggeringLogId = models.UUIDField()
+    triggeringLogId = models.UUIDField(db_index=True)
     contributingLogIds = models.JSONField(default=list)
 
     rootCauseDetail = models.TextField(blank=True, default='')
     resolvedAt = models.DateTimeField(null=True, blank=True)
-    assignedTo = models.CharField(max_length=150, null=True, blank=True)
+    assignedTo = models.CharField(max_length=150, null=True, blank=True, db_index=True)
+    acknowledgedAt = models.DateTimeField(null=True, blank=True)
+    escalationReason = models.TextField(blank=True, default='')
+    notes = models.TextField(blank=True, default='')
 
-    createdAt = models.DateTimeField(default=timezone.now)
+    createdAt = models.DateTimeField(default=timezone.now, db_index=True)
 
     def __str__(self):
         return self.incidentId
@@ -135,12 +140,13 @@ class LogEntry(models.Model):
         choices=SOURCE_TYPE_CHOICES
     )
 
-    sourceId = models.UUIDField()
-    timestamp = models.DateTimeField()
+    sourceId = models.UUIDField(db_index=True)
+    timestamp = models.DateTimeField(db_index=True)
 
     logLevel = models.CharField(
         max_length=10,
-        choices=LOG_LEVEL_CHOICES
+        choices=LOG_LEVEL_CHOICES,
+        db_index=True,
     )
 
     eventCode = models.CharField(max_length=100)
@@ -161,7 +167,7 @@ class LogEntry(models.Model):
 # ─────────────────────────────────────────────
 
 class HealthSnapshot(models.Model):
-    sourceId = models.UUIDField()
+    sourceId = models.UUIDField(db_index=True)
     sourceType = models.CharField(
         max_length=20,
         choices=SOURCE_TYPE_CHOICES
@@ -184,7 +190,7 @@ class HealthSnapshot(models.Model):
     softwareScore = models.FloatField()
     transactionScore = models.FloatField()
 
-    timestamp = models.DateTimeField()
+    timestamp = models.DateTimeField(db_index=True)
 
     createdAt = models.DateTimeField(default=timezone.now)
 
@@ -356,14 +362,14 @@ TRANSACTION_STATUS_CHOICES = [
 
 class Transaction(models.Model):
     atm             = models.ForeignKey('ATM', on_delete=models.SET_NULL, null=True, related_name='atm_transactions')
-    cardHash        = models.CharField(max_length=64)
+    cardHash        = models.CharField(max_length=64, db_index=True)
     amount          = models.FloatField()
     transactionType = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES, default='WITHDRAWAL')
     latitude        = models.FloatField(null=True, blank=True)
     longitude       = models.FloatField(null=True, blank=True)
     status          = models.CharField(max_length=20, choices=TRANSACTION_STATUS_CHOICES, default='COMPLETED')
     anomalyFlagId   = models.IntegerField(null=True, blank=True)
-    timestamp       = models.DateTimeField(default=timezone.now)
+    timestamp       = models.DateTimeField(default=timezone.now, db_index=True)
     createdAt       = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
@@ -422,6 +428,7 @@ class MessageTemplate(models.Model):
 ROLE_CHOICES = [
     ("ADMIN", "ADMIN"),
     ("ENGINEER", "ENGINEER"),
+    ("VIEWER", "VIEWER"),
 ]
 
 class UserProfile(models.Model):

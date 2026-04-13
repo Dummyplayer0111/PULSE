@@ -159,7 +159,7 @@ TEMPLATES = {
     # ── Cash Jam (8 languages) ────────────────────────────────────────────────
     ("cash_jam", "en"): (
         "Dear customer, the cash dispenser at ATM {atm_id} is temporarily unavailable due to a cash jam. "
-        "A field engineer has been alerted and is on the way. Estimated wait: 45 minutes."
+        "An engineer has been alerted and is on the way. Estimated wait: 45 minutes."
     ),
     ("cash_jam", "hi"): (
         "प्रिय ग्राहक, ATM {atm_id} में नकद वितरण अस्थायी रूप से उपलब्ध नहीं है। "

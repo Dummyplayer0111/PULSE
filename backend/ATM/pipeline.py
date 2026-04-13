@@ -37,6 +37,7 @@ Data flow (PULSE_Final_Plan_v2.md §9):
   broadcast  triggered   (language auto-selected)
 """
 
+import logging
 import os
 import uuid
 import random
@@ -46,6 +47,8 @@ import requests as http_requests
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 AI_SERVICE_URL = os.environ.get("AI_SERVICE_URL", "http://localhost:8001")
 
@@ -278,8 +281,8 @@ def _broadcast_atm(atm):
                 },
             }
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("broadcast_atm failed: %s", e)
 
 
 def _broadcast_log_entry(log_entry):
@@ -310,8 +313,8 @@ def _broadcast_log_entry(log_entry):
                 },
             }
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("broadcast_log_entry failed: %s", e)
 
 
 def _broadcast_pipeline_event(log_entry, classification, incident, heal_action):
@@ -344,8 +347,8 @@ def _broadcast_pipeline_event(log_entry, classification, incident, heal_action):
                 },
             }
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("broadcast_pipeline_event failed: %s", e)
 
 
 # ── Auto-assign to least-loaded engineer ──────────────────────────────────────
@@ -354,8 +357,10 @@ def _auto_assign_engineer(incident):
     """
     Pick the ENGINEER with the fewest open/investigating incidents and assign them.
     Returns the chosen username or None if no engineers exist.
+    Uses a single aggregated query instead of per-engineer count.
     """
     from .models import UserProfile, Incident as Inc
+    from django.db.models import Count
 
     engineers = list(
         UserProfile.objects.filter(role='ENGINEER').select_related('user')
@@ -363,16 +368,20 @@ def _auto_assign_engineer(incident):
     if not engineers:
         return None
 
-    def load(profile):
-        return Inc.objects.filter(
-            assignedTo=profile.user.username,
+    # Single query: count open incidents per engineer username
+    usernames = [e.user.username for e in engineers]
+    load_counts = dict(
+        Inc.objects.filter(
+            assignedTo__in=usernames,
             status__in=['OPEN', 'INVESTIGATING'],
-        ).count()
+        ).values('assignedTo').annotate(cnt=Count('id')).values_list('assignedTo', 'cnt')
+    )
 
-    chosen = min(engineers, key=load)
+    chosen = min(engineers, key=lambda p: load_counts.get(p.user.username, 0))
     incident.assignedTo = chosen.user.username
     incident.status     = 'INVESTIGATING'
-    incident.save(update_fields=['assignedTo', 'status'])
+    incident.acknowledgedAt = timezone.now()
+    incident.save(update_fields=['assignedTo', 'status', 'acknowledgedAt'])
     return chosen.user.username
 
 
@@ -392,8 +401,8 @@ def broadcast_customer_update(phone_hash, failed_txn):
                 },
             }
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("broadcast_customer_update failed: %s", e)
 
 
 def create_failed_transaction(incident, atm, failure_type='CASH_JAM',
@@ -603,15 +612,15 @@ def process_log(log_entry_id):
     atm = None
     try:
         atm = ATM.objects.get(id=log_entry.sourceId.int)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("ATM lookup failed for sourceId=%s: %s", log_entry.sourceId, e)
 
     # ── STEP 1: AI Root Cause Classification ─────────────────────────────────
     if log_entry.logLevel in ('ERROR', 'CRITICAL', 'WARN'):
         try:
             classification = _call_classify(log_entry.eventCode, log_entry.logLevel)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("AI classify failed for log %s: %s", log_entry.id, e)
 
     # ── STEP 2: Anomaly Check (Z-score via FastAPI /detect) ──────────────────
     if log_entry.logLevel in ('ERROR', 'CRITICAL'):
@@ -627,14 +636,25 @@ def process_log(log_entry_id):
                     logEntryId=log_entry.id,
                     status='FLAGGED',
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Anomaly detect failed for log %s: %s", log_entry.id, e)
 
     # ── STEP 3: Incident Created (ERROR/CRITICAL + confidence ≥ 0.65) ────────
     if classification and log_entry.logLevel in ('ERROR', 'CRITICAL'):
         confidence = classification.get('confidence', 0)
         category   = classification.get('category', 'UNKNOWN')
-        detail     = classification.get('detail', f'{category} failure detected by AI classifier')
+        atm_loc = atm.location if atm else 'unknown location'
+        fallback_detail = {
+            'NETWORK':  f'Network connectivity failure detected at {atm_loc}. Backup path switch recommended.',
+            'CASH_JAM': f'Cash dispenser jam detected at {atm_loc}. Engineer dispatch required.',
+            'HARDWARE': f'Hardware component failure at {atm_loc}. Physical inspection needed.',
+            'FRAUD':    f'Suspicious activity pattern at {atm_loc}. ATM frozen pending security review.',
+            'SERVER':   f'Application-layer failure at {atm_loc}. Service restart initiated.',
+            'TIMEOUT':  f'Operation timeout at {atm_loc}. Cache flush and retry recommended.',
+            'SWITCH':   f'Payment switch failure at {atm_loc}. Service restart initiated.',
+            'UNKNOWN':  f'Unrecognised failure pattern at {atm_loc}. Manual review recommended.',
+        }
+        detail = classification.get('detail') or fallback_detail.get(category, f'{category} failure at {atm_loc}.')
 
         if confidence >= 0.65 and category != 'UNKNOWN':
             severity_map = {'CRITICAL': 'CRITICAL', 'ERROR': 'HIGH', 'WARN': 'MEDIUM'}
@@ -739,8 +759,8 @@ def process_log(log_entry_id):
             if should_notify:
                 try:
                     _dispatch_customer_notifications(incident, atm=atm)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Customer notification failed for incident %s: %s", incident.incidentId, e)
 
             # ── STEP 8: Create FailedTransaction for customer portal ─────────
             # ~50% of matching incidents affect the test customer (realistic:
@@ -764,23 +784,26 @@ def process_log(log_entry_id):
                         phone=TEST_CUSTOMER_PHONE,
                         card_last4=TEST_CUSTOMER_CARD_LAST4,
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("FailedTransaction creation failed for incident %s: %s", incident.incidentId, e)
 
     # INFO events: gradually recover ATM health
-    elif log_entry.logLevel == 'INFO' and atm and atm.healthScore < 98:
-        atm.networkScore      = min(100, atm.networkScore + 2)
-        atm.hardwareScore     = min(100, atm.hardwareScore + 2)
-        atm.softwareScore     = min(100, atm.softwareScore + 2)
-        atm.transactionScore  = min(100, atm.transactionScore + 2)
-        atm.healthScore = round(
-            (atm.networkScore + atm.hardwareScore +
-             atm.softwareScore + atm.transactionScore) / 4, 1
-        )
-        if atm.status == 'OFFLINE' and atm.healthScore >= 40:
-            atm.status = 'DEGRADED'
-        elif atm.status == 'DEGRADED' and atm.healthScore >= 75:
-            atm.status = 'ONLINE'
+    elif log_entry.logLevel == 'INFO' and atm:
+        if atm.healthScore < 100:
+            atm.networkScore      = min(100, atm.networkScore + 2)
+            atm.hardwareScore     = min(100, atm.hardwareScore + 2)
+            atm.softwareScore     = min(100, atm.softwareScore + 2)
+            atm.transactionScore  = min(100, atm.transactionScore + 2)
+            atm.healthScore = round(
+                (atm.networkScore + atm.hardwareScore +
+                 atm.softwareScore + atm.transactionScore) / 4, 1
+            )
+        # Always sync status with health score (fixes stale DEGRADED/OFFLINE after recovery)
+        if atm.status != 'MAINTENANCE':
+            if atm.healthScore >= 75 and atm.status in ('DEGRADED', 'OFFLINE'):
+                atm.status = 'ONLINE'
+            elif atm.healthScore >= 40 and atm.status == 'OFFLINE':
+                atm.status = 'DEGRADED'
         atm.lastSeen = timezone.now()
         atm.save()
         _broadcast_atm(atm)

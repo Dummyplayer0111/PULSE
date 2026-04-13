@@ -5,8 +5,10 @@ from . import customer_views
 urlpatterns = [
 
     # DASHBOARD
-    path('dashboard/summary/',      views.dashboard_summary),
+    path('dashboard/summary/',         views.dashboard_summary),
     path('dashboard/health-overview/', views.health_overview),
+    path('dashboard/sla-metrics/',     views.sla_metrics),
+    path('dashboard/trends/',          views.dashboard_trends),
 
     # ATMs
     path('atms/',                          views.atm_list),
@@ -50,12 +52,17 @@ urlpatterns = [
     path('notifications/',            views.notification_list),
     path('notifications/send/',       views.send_notification),
     path('notifications/templates/',  views.template_list),
+    path('language-routing/',         views.language_routing),
 
     # SIMULATOR CONTROL
     path('simulator/start/',   views.simulator_start),
     path('simulator/stop/',    views.simulator_stop),
     path('simulator/status/',  views.simulator_status),
     path('simulator/demo-reset/', views.demo_reset),
+
+    # CHAOS INJECTION
+    path('chaos/inject/',     views.inject_scenario),
+    path('chaos/scenarios/',  views.list_scenarios),
 
     # PIPELINE FEED (REST fallback for live feed)
     path('pipeline/events/',   views.recent_pipeline_events),

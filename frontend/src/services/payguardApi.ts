@@ -158,6 +158,17 @@ export const payguardApi = createApi({
     getSimulatorStatus: builder.query<any, void>({   query: () => 'simulator/status/' }),
     resetAtmHealth:     builder.mutation<any, number>({ query: (id) => ({ url: `atms/${id}/reset-health/`, method: 'POST' }), invalidatesTags: ['ATMs'] }),
 
+    // ── SLA / TRENDS ────────────────────────────────────────
+    getSLAMetrics:       builder.query<any, void>({ query: () => 'dashboard/sla-metrics/' }),
+    getDashboardTrends:  builder.query<any, void>({ query: () => 'dashboard/trends/' }),
+
+    // ── CHAOS INJECTION ─────────────────────────────────────
+    getChaosScenarios: builder.query<any[], void>({ query: () => 'chaos/scenarios/' }),
+    injectChaos: builder.mutation<any, { scenario: string; atm_id?: number }>({
+      query: (body) => ({ url: 'chaos/inject/', method: 'POST', body }),
+      invalidatesTags: ['Incidents', 'Logs', 'Anomalies', 'SelfHealActions', 'ATMs'],
+    }),
+
     // ── TRANSACTIONS ──────────────────────────────────────────
     getTransactions: builder.query<any[], { flagged?: boolean; limit?: number } | undefined>({
       query: (params) => {
@@ -190,6 +201,10 @@ export const payguardApi = createApi({
     createTemplate: builder.mutation<any, object>({
       query: (body) => ({ url: 'notifications/templates/', method: 'POST', body }),
       invalidatesTags: ['Templates'],
+    }),
+    getLanguageRouting: builder.query<any, void>({
+      query: () => 'language-routing/',
+      providesTags: ['Notifications'],
     }),
 
   }),
@@ -236,4 +251,9 @@ export const {
   useSendNotificationMutation,
   useGetTemplatesQuery,
   useCreateTemplateMutation,
+  useGetLanguageRoutingQuery,
+  useGetChaosScenariosQuery,
+  useInjectChaosMutation,
+  useGetSLAMetricsQuery,
+  useGetDashboardTrendsQuery,
 } = payguardApi;

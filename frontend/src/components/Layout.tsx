@@ -6,8 +6,9 @@ import { clearAuth } from '../store/authSlice';
 import {
   LayoutDashboard, Map, AlertTriangle, Brain,
   ShieldAlert, MessageSquare, Settings, LogOut, ScrollText,
-  Sun, Moon, Wrench,
+  Sun, Moon, Wrench, Eye,
 } from 'lucide-react';
+import { SoundToggleButton } from './notifications/ToastProvider';
 
 const ADMIN_NAV = [
   { to: '/dashboard',      label: 'Dashboard',      Icon: LayoutDashboard },
@@ -24,6 +25,11 @@ const ENGINEER_NAV = [
   { to: '/engineer', label: 'My Incidents', Icon: Wrench },
 ];
 
+const VIEWER_NAV = [
+  { to: '/viewer',   label: 'My Status',    Icon: Eye             },
+  { to: '/atm-map',  label: 'Find ATMs',    Icon: Map             },
+];
+
 function getInitialTheme(): 'dark' | 'light' {
   const stored = localStorage.getItem('payguard-theme') as 'dark' | 'light' | null;
   if (stored === 'dark' || stored === 'light') return stored;
@@ -36,7 +42,8 @@ export default function Layout() {
   const auth       = useSelector((s: RootState) => s.auth);
   const token      = localStorage.getItem('access_token');
   const isEngineer = auth.role === 'ENGINEER';
-  const NAV        = isEngineer ? ENGINEER_NAV : ADMIN_NAV;
+  const isViewer   = auth.role === 'VIEWER';
+  const NAV        = isEngineer ? ENGINEER_NAV : isViewer ? VIEWER_NAV : ADMIN_NAV;
 
   const [theme, setTheme] = useState<'dark' | 'light'>(getInitialTheme);
 
@@ -96,6 +103,8 @@ export default function Layout() {
           <p className="text-sm font-black tracking-tight" style={{ color: '#feeaa5', letterSpacing: '-0.02em', textShadow: '0 0 12px rgba(196,151,70,0.3)' }}>
             PayGuard
           </p>
+          <div className="flex items-center gap-1.5">
+          <SoundToggleButton />
           {/* Theme toggle */}
           <button
             onClick={toggle}
@@ -117,6 +126,7 @@ export default function Layout() {
           >
             {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
           </button>
+          </div>
         </div>
 
         {/* Section label */}

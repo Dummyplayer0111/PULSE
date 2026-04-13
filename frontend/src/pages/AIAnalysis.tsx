@@ -7,7 +7,7 @@ import {
   Brain, Play, Square, Activity, AlertTriangle, CheckCircle,
   Zap, Wifi, WifiOff, Loader, BarChart2, ChevronDown, ChevronUp,
   X, Info, Shield, Network, HardDrive, CreditCard, Search,
-  TrendingDown, Server,
+  TrendingDown, Server, Flame, Bug, Radio, Cpu,
 } from 'lucide-react';
 import {
   useStartSimulatorMutation,
@@ -19,6 +19,8 @@ import {
   useGetATMsQuery,
   useGetAIFailureTrendQuery,
   useGetRecentPipelineEventsQuery,
+  useGetChaosScenariosQuery,
+  useInjectChaosMutation,
 } from '../services/payguardApi';
 import { usePipelineSocket, PipelineEvent } from '../hooks/usePipelineSocket';
 import { RootState } from '../store';
@@ -854,10 +856,39 @@ function FailureTrendChart() {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+// ─── Chaos Scenario Config ─────────────────────────────────────────────────
+
+const CHAOS_SCENARIOS = [
+  { key: 'CASH_JAM',         label: 'Cash Jam',        icon: HardDrive, color: '#f59e0b', desc: 'Dispenser motor stalls — bills jammed' },
+  { key: 'NETWORK_OUTAGE',   label: 'Network Outage',  icon: Radio,     color: '#60a5fa', desc: 'Switch drops — host unreachable' },
+  { key: 'FRAUD_ATTEMPT',    label: 'Fraud / Skimming', icon: Shield,   color: '#ef4444', desc: 'Skimmer detected — cloned card attempts' },
+  { key: 'HARDWARE_FAILURE', label: 'Hardware Failure', icon: Cpu,       color: '#f97316', desc: 'UPS critical — thermal runaway' },
+  { key: 'MASS_FAILURE',     label: 'Mass Failure',     icon: Flame,     color: '#dc2626', desc: 'Upstream switch down — cascading outage' },
+] as const;
+
+
 export default function AIAnalysisPage() {
   const [startSim] = useStartSimulatorMutation();
   const [stopSim]  = useStopSimulatorMutation();
   const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  // Chaos injection
+  const [injectChaos] = useInjectChaosMutation();
+  const [chaosActive, setChaosActive] = useState<string | null>(null);
+  const [chaosResult, setChaosResult] = useState<any>(null);
+
+  const handleInjectChaos = async (scenarioKey: string) => {
+    setChaosActive(scenarioKey);
+    setChaosResult(null);
+    try {
+      const result = await injectChaos({ scenario: scenarioKey }).unwrap();
+      setChaosResult(result);
+    } catch {
+      setChaosResult({ error: true });
+    } finally {
+      setTimeout(() => setChaosActive(null), 2000);
+    }
+  };
 
   const { data: simStatus } = useGetSimulatorStatusQuery(undefined, { pollingInterval: 2000 });
   const { data: incidents = [] } = useGetIncidentsQuery(undefined, { pollingInterval: 5000 });
@@ -965,6 +996,70 @@ export default function AIAnalysisPage() {
           delay={180}
         />
       </div>
+
+      {/* ── Chaos Injection Panel ── */}
+      <BentoCard delay={60} style={{ padding: 16 }}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              <Flame size={13} style={{ color: '#ef4444' }} />
+            </div>
+            <div>
+              <span className="text-sm font-semibold text-white">Chaos Injection</span>
+              <span className="text-[10px] ml-2" style={{ color: 'var(--p-text-muted)' }}>Trigger failure scenarios on demand</span>
+            </div>
+          </div>
+          {chaosResult && !chaosResult.error && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-lg animate-pulse" style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.25)' }}>
+              <CheckCircle size={12} style={{ color: '#4ade80' }} />
+              <span className="text-[10px] font-semibold" style={{ color: '#4ade80' }}>
+                {chaosResult.logsInjected} logs injected into {chaosResult.targetAtms?.join(', ')}
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+          {CHAOS_SCENARIOS.map(({ key, label, icon: Icon, color, desc }) => {
+            const isActive = chaosActive === key;
+            return (
+              <button
+                key={key}
+                onClick={() => !chaosActive && handleInjectChaos(key)}
+                disabled={!!chaosActive}
+                className="group relative flex flex-col items-center gap-2 px-3 py-3.5 rounded-xl text-center transition-all duration-200"
+                style={{
+                  background: isActive ? `${color}22` : 'var(--p-card-strong)',
+                  border: `1px solid ${isActive ? color + '55' : 'var(--p-card-border)'}`,
+                  opacity: chaosActive && !isActive ? 0.4 : 1,
+                  cursor: chaosActive ? 'wait' : 'pointer',
+                }}
+              >
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200"
+                  style={{
+                    background: isActive ? `${color}33` : `${color}15`,
+                    border: `1px solid ${color}33`,
+                    transform: isActive ? 'scale(1.1)' : undefined,
+                  }}
+                >
+                  {isActive
+                    ? <Loader size={15} className="animate-spin" style={{ color }} />
+                    : <Icon size={15} style={{ color }} />
+                  }
+                </div>
+                <span className="text-[11px] font-semibold text-white">{label}</span>
+                <span className="text-[9px] leading-tight" style={{ color: 'var(--p-text-muted)' }}>{desc}</span>
+                {!chaosActive && (
+                  <span
+                    className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                    style={{ background: `${color}08`, border: `1px solid ${color}33` }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </BentoCard>
 
       {/* ── Main layout ── */}
       <div className="flex flex-col gap-4 flex-1">

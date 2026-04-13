@@ -472,7 +472,7 @@ export default function ATMDetail() {
       ) : (
         <>
           {/* Overview strip */}
-          <BentoCard delay={0} style={{ padding: 24, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 32 }}>
+          <BentoCard delay={0} style={{ padding: '28px 32px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 36 }}>
             {/* Health score gauge */}
             <HealthGauge score={atm?.healthScore ?? 0} label="Health Score" size={110} />
 
@@ -481,13 +481,13 @@ export default function ATMDetail() {
               {[
                 { label: 'Network',     value: atm?.networkScore,     color: '#60a5fa' },
                 { label: 'Hardware',    value: atm?.hardwareScore,    color: '#f97316' },
-                { label: 'Software',    value: atm?.softwareScore,    color: '#a78bfa' },
+                { label: 'Uptime',      value: atm?.softwareScore,    color: '#a78bfa' },
                 { label: 'Transaction', value: atm?.transactionScore, color: '#4ade80' },
               ].map(({ label, value, color }) => (
                 <div
                   key={label}
-                  className="rounded-xl p-3"
-                  style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)' }}
+                  className="rounded-xl"
+                  style={{ background: 'var(--p-card)', border: '1px solid var(--p-card-border)', padding: '10px 16px' }}
                 >
                   <p className="text-[10px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{label}</p>
                   <p className="text-lg font-bold mt-0.5" style={{ color: value != null && (value as number) >= 80 ? color : value != null && (value as number) >= 60 ? '#f59e0b' : '#ef4444' }}>
@@ -501,11 +501,11 @@ export default function ATMDetail() {
             {/* ATM meta */}
             <div className="flex-1 min-w-[200px]">
               {atm && (
-                <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                <div className="grid grid-cols-2 gap-x-10 gap-y-3">
                   {['location', 'model', 'serialNumber', 'region'].map(k => (
                     (atm as any)[k] && (
                       <div key={k}>
-                        <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>{k}</p>
+                        <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>{k.replace(/([A-Z])/g, ' $1').trim()}</p>
                         <p className="text-sm text-white mt-0.5">{String((atm as any)[k])}</p>
                       </div>
                     )
@@ -784,7 +784,7 @@ export default function ATMDetail() {
                   <table className="w-full">
                     <thead>
                       <tr style={{ borderBottom: '1px solid var(--p-card-border)' }}>
-                        <TH>Timestamp</TH><TH>Health</TH><TH>Network</TH><TH>Hardware</TH><TH>Software</TH><TH>Transaction</TH>
+                        <TH>Timestamp</TH><TH>Health</TH><TH>Network</TH><TH>Hardware</TH><TH>Uptime</TH><TH>Transaction</TH>
                       </tr>
                     </thead>
                     <tbody>

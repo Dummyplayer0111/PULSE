@@ -9,7 +9,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         user, created = User.objects.get_or_create(
             username='engineer1',
-            defaults={'email': 'engineer1@pulse.local', 'first_name': 'Field', 'last_name': 'Engineer'},
+            defaults={'email': 'engineer1@pulse.local', 'first_name': 'ATM', 'last_name': 'Engineer'},
         )
         if created:
             user.set_password('pulse2026')
@@ -20,11 +20,11 @@ class Command(BaseCommand):
 
         profile, pcreated = UserProfile.objects.get_or_create(
             user=user,
-            defaults={'role': 'ENGINEER', 'fullName': 'Field Engineer'},
+            defaults={'role': 'ENGINEER', 'fullName': 'Engineer'},
         )
         if not pcreated:
             profile.role = 'ENGINEER'
-            profile.fullName = profile.fullName or 'Field Engineer'
+            profile.fullName = profile.fullName or 'Engineer'
             profile.save()
 
         self.stdout.write(self.style.SUCCESS(

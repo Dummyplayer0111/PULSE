@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AlertCircle, Map, Wifi, WifiOff, Loader, Filter, ChevronDown } from 'lucide-react';
+import { AlertCircle, Map, Wifi, WifiOff, Loader, Filter, ChevronDown, Flame, MapPin } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useGetATMsQuery } from '../services/payguardApi';
 import { selectATM, closeSidePanel } from '../store/uiSlice';
@@ -26,6 +26,7 @@ export default function ATMMapPage() {
   const [healthMin,    setHealthMin]    = useState<number>(0);
   const [healthMax,    setHealthMax]    = useState<number>(100);
   const [filtersOpen,  setFiltersOpen]  = useState<boolean>(false);
+  const [heatmapMode,  setHeatmapMode]  = useState<boolean>(false);
 
   const { data: apiATMs = [], isLoading, error } = useGetATMsQuery(undefined, { pollingInterval: 30_000 });
   const { status: wsStatus, liveATMs } = useATMSocket();
@@ -130,6 +131,21 @@ export default function ATMMapPage() {
            wsStatus === 'connecting' ? <><Loader   size={11} className="animate-spin" style={{ color: '#f59e0b' }} /><span style={{ fontSize: 10, fontWeight: 500, color: '#f59e0b' }}>Connecting</span></> :
                                        <><WifiOff  size={11} style={{ color: '#ef4444' }} /><span style={{ fontSize: 10, fontWeight: 500, color: '#ef4444' }}>Offline</span></>}
         </div>
+
+        {/* Heatmap toggle */}
+        <button
+          onClick={() => setHeatmapMode(v => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+            padding: '5px 12px', borderRadius: 8, cursor: 'pointer',
+            background: heatmapMode ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)',
+            border: heatmapMode ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(255,255,255,0.08)',
+            color: heatmapMode ? '#ef4444' : 'rgba(255,255,255,0.5)',
+          }}
+        >
+          {heatmapMode ? <Flame size={11} /> : <MapPin size={11} />}
+          <span style={{ fontSize: 11, fontWeight: 500 }}>{heatmapMode ? 'Heatmap' : 'Markers'}</span>
+        </button>
 
         {/* Filters button */}
         <button
@@ -247,6 +263,7 @@ export default function ATMMapPage() {
             atms={filteredAtms}
             selectedId={selectedATMId}
             onATMClick={(atm) => dispatch(selectATM(atm.id === selectedATMId ? null : atm.id))}
+            heatmapMode={heatmapMode}
           />
         )}
 

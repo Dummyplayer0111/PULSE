@@ -437,8 +437,29 @@ class Command(BaseCommand):
                     )
                     log_batch.extend(entries)
 
+            # ── CRITICAL: inject logs in the CURRENT hour ──
+            # The pipeline health formula only looks at the last 1 hour,
+            # so we must have fresh logs for health scores to be non-100.
+            current_hour_start = now - timedelta(minutes=45)
+            if tier == "green":
+                # Healthy: mostly INFO, maybe 1 WARN
+                ci, cw, ce, cc = random.randint(8, 15), random.randint(0, 1), 0, 0
+            elif tier == "yellow":
+                # Degraded: some errors + warns
+                ci, cw, ce, cc = random.randint(4, 8), random.randint(1, 3), random.randint(1, 3), random.randint(0, 1)
+            else:
+                # Red/offline: lots of errors + criticals
+                ci, cw, ce, cc = random.randint(2, 5), random.randint(1, 2), random.randint(3, 5), random.randint(1, 3)
+
+            recent_entries, seq = _generate_logs_for_hour(
+                atm, current_hour_start, ci, cw, ce, cc,
+                weak_component or "network", seq_offset=seq,
+            )
+            log_batch.extend(recent_entries)
+
             LogEntry.objects.bulk_create(log_batch, ignore_conflicts=True)
-            self.stdout.write(f"  {atm.name}: {len(log_batch)} logs seeded")
+            self.stdout.write(f"  {atm.name}: {len(log_batch)} logs seeded "
+                              f"(+{len(recent_entries)} in current hour)")
 
         # ── 3. Seed HealthSnapshot history (every 4 h for 7 days) ────────────
         self.stdout.write("\n── Seeding HealthSnapshot history ──")
@@ -536,6 +557,59 @@ class Command(BaseCommand):
                 )
 
             self.stdout.write(f"  {atm.name}: {n_incidents} incident(s) → {assigned}")
+
+        # ── 5. Recalculate health using actual pipeline formula ──────────────
+        # This ensures healthScore matches what _recalculate_health_score()
+        # would return, so there's no mismatch when the simulator runs.
+        self.stdout.write("\n── Recalculating health from pipeline formula ──")
+        from ATM.pipeline import _recalculate_health_score
+
+        for atm, tier, weak_component in atm_tiers:
+            source_id = _atm_uuid(atm)
+            computed = _recalculate_health_score(source_id, "ATM")
+
+            # For yellow/red, also degrade the weak sub-score proportionally
+            if tier == "green":
+                atm.networkScore = round(random.uniform(90, 99), 1)
+                atm.hardwareScore = round(random.uniform(90, 99), 1)
+                atm.softwareScore = round(random.uniform(90, 99), 1)
+                atm.transactionScore = round(random.uniform(90, 99), 1)
+            elif tier == "yellow":
+                base_sub = round(random.uniform(78, 88), 1)
+                weak_sub = round(random.uniform(50, 65), 1)
+                atm.networkScore = weak_sub if weak_component == "network" else base_sub
+                atm.hardwareScore = weak_sub if weak_component == "hardware" else base_sub
+                atm.softwareScore = weak_sub if weak_component == "software" else base_sub
+                atm.transactionScore = weak_sub if weak_component == "transaction" else base_sub
+            else:  # red
+                base_sub = round(random.uniform(55, 70), 1)
+                weak_sub = round(random.uniform(20, 45), 1)
+                second_weak = round(random.uniform(40, 58), 1)
+                subs = {"network": base_sub, "hardware": base_sub,
+                        "software": base_sub, "transaction": base_sub}
+                if weak_component and weak_component in subs:
+                    subs[weak_component] = weak_sub
+                    others = [k for k in subs if k != weak_component]
+                    subs[random.choice(others)] = second_weak
+                atm.networkScore = subs["network"]
+                atm.hardwareScore = subs["hardware"]
+                atm.softwareScore = subs["software"]
+                atm.transactionScore = subs["transaction"]
+
+            atm.healthScore = computed
+            if atm.status != 'MAINTENANCE':
+                if computed < 30:
+                    atm.status = 'OFFLINE'
+                elif computed < 60:
+                    atm.status = 'DEGRADED'
+                else:
+                    atm.status = 'ONLINE'
+            atm.save()
+            self.stdout.write(
+                f"  {atm.name}: formula={computed}  status={atm.status}  "
+                f"net={atm.networkScore} hw={atm.hardwareScore} "
+                f"sw={atm.softwareScore} tx={atm.transactionScore}"
+            )
 
         # ── Summary ───────────────────────────────────────────────────────────
         self.stdout.write("\n" + "=" * 52)

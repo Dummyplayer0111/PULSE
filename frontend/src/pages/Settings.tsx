@@ -30,7 +30,7 @@ const HEAL_DESCRIPTIONS: Record<string, string> = {
   RESTART_SERVICE: 'Restart ATM service process on SWITCH / SERVER failures',
   FLUSH_CACHE:     'Flush cache + retry queue on TIMEOUT failures',
   REROUTE_TRAFFIC: 'Reroute payment traffic to alternate gateway',
-  ALERT_ENGINEER:  'Dispatch field engineer for CASH_JAM / HARDWARE failures',
+  ALERT_ENGINEER:  'Dispatch engineer for CASH_JAM / HARDWARE failures',
   FREEZE_ATM:      'Freeze ATM immediately on FRAUD / MALWARE detection',
 };
 

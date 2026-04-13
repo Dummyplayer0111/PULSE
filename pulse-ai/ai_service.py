@@ -38,7 +38,7 @@ async def classify(data: dict = Body(...)):
 
     detail_map = {
         "NETWORK":  "Network connectivity or gateway issue detected. Switch to backup path recommended.",
-        "CASH_JAM": "Cash dispenser or hardware jam detected. Field engineer dispatch required.",
+        "CASH_JAM": "Cash dispenser or hardware jam detected. Engineer dispatch required.",
         "HARDWARE": "Hardware component failure detected. Physical inspection required.",
         "FRAUD":    "Suspicious activity pattern detected. ATM frozen pending security review.",
         "SERVER":   "Service or application-layer failure detected. Restart sequence initiated.",
@@ -51,7 +51,7 @@ async def classify(data: dict = Body(...)):
         "detail": detail_map.get(category, f"AI classified as {category} via {event_code}."),
         "confidence": confidence,
         "selfHealAction": self_heal,
-        "recommendedAction": "Dispatch field engineer" if self_heal in ("NONE", "ALERT_ENGINEER") else "Auto-recovering…",
+        "recommendedAction": "Dispatch engineer" if self_heal in ("NONE", "ALERT_ENGINEER") else "Auto-recovering…",
         "keywords": event_code.lower().split("_"),
     }
 
@@ -200,4 +200,4 @@ async def fraud_detect(data: dict = Body(...)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="127.0.0.1", port=8001)
